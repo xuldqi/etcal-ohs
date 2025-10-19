@@ -143,17 +143,51 @@ export class StorageManager {
   }
 
   async removeItem(key: string): Promise<void> {
+    // 同时从内存和持久化存储删除
     this.store.delete(key)
+    if (this.preferencesStore) {
+      try {
+        await this.preferencesStore.delete(key)
+        await this.preferencesStore.flush()
+        console.log(`[存储] 持久化删除: ${key}`)
+      } catch (error) {
+        console.error(`[存储] 持久化删除失败: ${key}`, error)
+      }
+    }
   }
 
   async clear(): Promise<void> {
+    // 同时清空内存和持久化存储
     this.store.clear()
+    if (this.preferencesStore) {
+      try {
+        await this.preferencesStore.clear()
+        await this.preferencesStore.flush()
+        console.log('[存储] 持久化清空完成')
+      } catch (error) {
+        console.error('[存储] 持久化清空失败:', error)
+      }
+    }
   }
 
   async setBatch(entries: StorageEntry[]): Promise<void> {
+    // 同时保存到内存和持久化存储
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]
       this.store.set(entry.key, entry.value)
+    }
+    
+    if (this.preferencesStore) {
+      try {
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i]
+          await this.preferencesStore.put(entry.key, entry.value)
+        }
+        await this.preferencesStore.flush()
+        console.log(`[存储] 批量持久化保存: ${entries.length} 项`)
+      } catch (error) {
+        console.error('[存储] 批量持久化保存失败:', error)
+      }
     }
   }
 

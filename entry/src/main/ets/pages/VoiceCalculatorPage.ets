@@ -61,14 +61,14 @@ export struct VoiceCalculatorPage {
     this.voiceManager.stopListening()
   }
 
-  private initializeManagers(): void {
+  private async initializeManagers(): Promise<void> {
     try {
       if (!this.abilityContext) {
         try {
           this.abilityContext = (getContext(this) as common.UIAbilityContext) ?? null
           if (this.abilityContext) {
             this.voiceManager.setContext(this.abilityContext)
-            void this.storageManager.init(this.abilityContext)
+            await this.storageManager.init(this.abilityContext)
           } else {
             console.warn('无法获取 UIAbilityContext，语音权限请求可能失败')
           }
@@ -77,7 +77,7 @@ export struct VoiceCalculatorPage {
         }
       } else {
         this.voiceManager.setContext(this.abilityContext)
-        void this.storageManager.init(this.abilityContext)
+        await this.storageManager.init(this.abilityContext)
       }
 
       this.voiceManager.setCallbacks(
@@ -86,7 +86,9 @@ export struct VoiceCalculatorPage {
         (status: string) => this.handleVoiceStatus(status)
       )
       this.isVoiceSupported = this.voiceManager.isVoiceRecognitionAvailable()
-      this.loadCalculationHistory()
+      
+      // 等待存储初始化完成后再加载历史
+      await this.loadCalculationHistory()
       console.log('语音计算器管理器初始化完成')
     } catch (error) {
       console.error('语音计算器管理器初始化失败:', error)
@@ -129,17 +131,17 @@ export struct VoiceCalculatorPage {
     this.dialogCancelHandler = null
   }
 
-  private loadCalculationHistory(): void {
-    this.storageManager.loadCalculationHistory()
-      .then((history: string[]) => {
-        if (history && history.length > 0) {
-          this.calculationHistory = history
-          this.lastResult = history[0]
-        }
-      })
-      .catch((error: Error) => {
-        console.error('加载计算历史失败:', error)
-      })
+  private async loadCalculationHistory(): Promise<void> {
+    try {
+      const history: string[] = await this.storageManager.loadCalculationHistory()
+      if (history && history.length > 0) {
+        this.calculationHistory = history
+        this.lastResult = history[0]
+        console.log(`[存储] 加载计算历史成功: ${history.length} 条记录`)
+      }
+    } catch (error) {
+      console.error('加载计算历史失败:', error)
+    }
   }
 
   private handleVoiceResult(result: string): void {
