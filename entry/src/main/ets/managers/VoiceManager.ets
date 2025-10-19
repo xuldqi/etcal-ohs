@@ -664,16 +664,9 @@ export class VoiceManager {
     // 这里应该调用HarmonyOS的SpeechRecognizer API
     // 实际应该使用HarmonyOS的语音识别服务
     
-    // 模拟真实语音识别结果（用于演示）
-    const mathExpressions = [
-      '1+1', '2+3', '5-2', '3×4', '8÷2',
-      '1+2+3', '10-5', '2×3+1', '6÷2+1', '3+4×2'
-    ]
-    
-    const randomExpression = mathExpressions[Math.floor(Math.random() * mathExpressions.length)]
-    console.log('[HarmonyOS] 原生识别结果:', randomExpression)
-    
-    return randomExpression
+    // 在模拟器中，如果没有真实语音输入，返回null
+    console.log('[HarmonyOS] 模拟器环境，未检测到真实语音输入')
+    return null
   }
 
   // 获取百度语音识别结果
