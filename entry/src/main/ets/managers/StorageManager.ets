@@ -1,6 +1,7 @@
 // 简化的存储管理器：使用内存 Map 模拟持久化能力
 
 import common from '@ohos.app.ability.common'
+import preferences from '@ohos.data.preferences'
 
 interface StorageEntry {
   key: string
@@ -70,6 +71,7 @@ export class StorageManager {
   private static instance: StorageManager | null = null
   private store: Map<string, string> = new Map()
   private context: common.UIAbilityContext | null = null
+  private preferencesStore: preferences.Preferences | null = null
 
   private constructor() {}
 
@@ -82,13 +84,46 @@ export class StorageManager {
 
   async init(context: common.UIAbilityContext): Promise<void> {
     this.context = context
+    try {
+      // 初始化持久化存储
+      this.preferencesStore = await preferences.getPreferences(context, 'chmath_storage')
+      console.log('[存储] 持久化存储初始化成功')
+    } catch (error) {
+      console.error('[存储] 持久化存储初始化失败:', error)
+    }
   }
 
   async setItem(key: string, value: string): Promise<void> {
+    // 同时保存到内存和持久化存储
     this.store.set(key, value)
+    if (this.preferencesStore) {
+      try {
+        await this.preferencesStore.put(key, value)
+        await this.preferencesStore.flush()
+        console.log(`[存储] 持久化保存: ${key} = ${value}`)
+      } catch (error) {
+        console.error(`[存储] 持久化保存失败: ${key}`, error)
+      }
+    }
   }
 
   async getItem(key: string): Promise<string | null> {
+    // 优先从持久化存储读取
+    if (this.preferencesStore) {
+      try {
+        const value = await this.preferencesStore.get(key, '') as string
+        if (value !== '') {
+          // 同步到内存
+          this.store.set(key, value)
+          console.log(`[存储] 从持久化存储读取: ${key} = ${value}`)
+          return value
+        }
+      } catch (error) {
+        console.error(`[存储] 从持久化存储读取失败: ${key}`, error)
+      }
+    }
+    
+    // 如果持久化存储失败，从内存读取
     if (this.store.has(key)) {
       return this.store.get(key) as string
     }

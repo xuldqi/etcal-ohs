@@ -7,6 +7,7 @@ import { VisualLearningPage } from './VisualLearningPage';
 import { LearningReportPage } from './LearningReportPage';
 import { VoiceSettingsPage } from './VoiceSettingsPage';
 import { AppSettingsPage } from './AppSettingsPage';
+import { ReportIssuePage } from './ReportIssuePage';
 import { StorageManager } from '../managers/StorageManager';
 import common from '@ohos.app.ability.common';
 
@@ -51,7 +52,8 @@ struct Index {
   @State currentVoice: string = '小美老师'
   @State showPrivacyDialog: boolean = false
   @State hasAgreedPrivacy: boolean = false
-  @State showPolicyPage: string = '' // 'privacy' | 'agreement' | ''
+  @State showPolicyPage: string = ''
+  private privacyChecked: boolean = false // 'privacy' | 'agreement' | ''
   @State learningStats: LearningStats = {
     totalProblems: 0,
     correctAnswers: 0,
@@ -107,20 +109,39 @@ struct Index {
 
   // 检查隐私说明同意状态
   private async checkPrivacyAgreement() {
+    // 防止重复检查
+    if (this.privacyChecked) {
+      console.log('[隐私] 已经检查过隐私状态，跳过')
+      return
+    }
+    
+    this.privacyChecked = true
+    
     try {
+      // 等待存储管理器初始化完成
+      await new Promise<void>(resolve => setTimeout(resolve, 100))
+      
       const storageManager = StorageManager.getInstance()
       const hasAgreed = await storageManager.getPrivacyAgreement()
       this.hasAgreedPrivacy = hasAgreed
       
+      console.log('[隐私] 检查隐私同意状态:', hasAgreed)
+      
       if (!hasAgreed) {
-        // 延迟显示弹窗，确保界面已加载
+        // 只有在用户未同意时才显示弹窗
+        console.log('[隐私] 用户未同意隐私协议，显示弹窗')
         setTimeout(() => {
           this.showPrivacyDialog = true
         }, 500)
+      } else {
+        console.log('[隐私] 用户已同意隐私协议，不显示弹窗')
+        // 确保弹窗不显示
+        this.showPrivacyDialog = false
       }
     } catch (error) {
       console.error('检查隐私说明同意状态失败:', error)
-      // 如果检查失败，显示弹窗
+      // 如果检查失败，假设用户未同意，显示弹窗
+      console.log('[隐私] 检查失败，显示弹窗')
       setTimeout(() => {
         this.showPrivacyDialog = true
       }, 500)
@@ -134,7 +155,10 @@ struct Index {
       await storageManager.setPrivacyAgreement(true)
       this.hasAgreedPrivacy = true
       this.showPrivacyDialog = false
-      console.log('用户已同意隐私说明')
+      console.log('[隐私] 用户已同意隐私说明，状态已保存')
+      
+      // 确保状态同步
+      this.privacyChecked = true
     } catch (error) {
       console.error('保存隐私说明同意状态失败:', error)
       this.showPrivacyDialog = false
@@ -263,6 +287,10 @@ struct Index {
         })
       } else if (this.currentPage === 'settings') {
         AppSettingsPage({ 
+          onNavigate: (page: string) => this.navigateToPage(page)
+        })
+      } else if (this.currentPage === 'report-issue') {
+        ReportIssuePage({ 
           onNavigate: (page: string) => this.navigateToPage(page)
         })
       }

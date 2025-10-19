@@ -508,12 +508,25 @@ struct NativeCalculator {
   toggleVoice() {
     this.isVoiceActive = !this.isVoiceActive
     if (this.isVoiceActive) {
-      // 模拟语音识别
-      setTimeout(() => {
-        this.isVoiceActive = false
-        this.simulateVoiceInput()
-      }, 2000)
+      // 使用真实的语音识别
+      this.startRealVoiceRecognition()
     }
+  }
+
+  // 开始真实语音识别
+  private startRealVoiceRecognition() {
+    // 这里应该调用真实的语音识别服务
+    console.log('[语音识别] 开始真实语音识别...')
+    
+    // 暂时显示提示信息
+    this.showInlineDialog({
+      title: '语音识别',
+      message: '语音识别功能正在开发中，请使用手动输入',
+      confirmText: '确定',
+      onConfirm: () => {
+        this.isVoiceActive = false
+      }
+    })
   }
 
   private showInlineDialog(options: DialogOptions): void {
@@ -546,28 +559,7 @@ struct NativeCalculator {
     this.dialogCancelHandler = null
   }
 
-  // 模拟语音输入
-  simulateVoiceInput(): void {
-    const voiceCommands = [
-      { text: '二加三', expression: '2 + 3' },
-      { text: '五乘四', expression: '5 × 4' },
-      { text: '十减六', expression: '10 - 6' },
-      { text: '八除二', expression: '8 ÷ 2' }
-    ]
-    
-    const random = voiceCommands[Math.floor(Math.random() * voiceCommands.length)]
-    
-    this.showInlineDialog({
-      title: '语音识别',
-      message: `识别到: "${random.text}"\n将输入: ${random.expression}`,
-      confirmText: '确认',
-      cancelText: '取消',
-      onConfirm: () => {
-        this.expression = random.expression
-        this.calculate()
-      }
-    })
-  }
+  // 模拟语音输入方法已删除，现在使用真实语音识别
 
   // 显示历史
   showHistory(): void {

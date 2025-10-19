@@ -112,7 +112,8 @@ export struct AppSettingsPage {
       description: '举报不当内容或安全隐患',
       icon: '',
       color: '#ef4444',
-      type: 'info',
+      type: 'navigation',
+      route: 'report-issue',
       content: {
         title: '问题举报',
         sections: [

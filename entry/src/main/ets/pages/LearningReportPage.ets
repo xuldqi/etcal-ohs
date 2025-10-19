@@ -91,32 +91,11 @@ export struct LearningReportPage {
   }
   @State dailyProgress: DailyProgressItem[] = []
 
-  // 生成最近7天的学习数据
+  // 生成最近7天的学习数据（已删除模拟数据）
   private generateDailyProgress() {
-    const today = new Date()
-    const progress: DailyProgressItem[] = []
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      
-      const month = (date.getMonth() + 1).toString().padStart(2, '0')
-      const day = date.getDate().toString().padStart(2, '0')
-      
-      // 模拟学习数据
-      const questions = Math.floor(Math.random() * 20) + 10 // 10-30题
-      const correctRate = Math.floor(Math.random() * 30) + 70 // 70-100%
-      const minutes = Math.floor(Math.random() * 30) + 15 // 15-45分钟
-      
-      progress.push({
-        date: `${month}-${day}`,
-        questions: questions,
-        correctRate: correctRate,
-        minutes: minutes
-      })
-    }
-    
-    this.dailyProgress = progress
+    // 此方法已不再使用，现在使用真实的存储数据
+    // 模拟数据已完全移除
+    this.dailyProgress = []
   }
 
   private audioManager: AudioManager = new AudioManager()

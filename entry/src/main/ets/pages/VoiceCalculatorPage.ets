@@ -719,8 +719,35 @@ export struct VoiceCalculatorPage {
     this.showInlineDialog({
       title: '计算历史',
       message,
-      confirmText: '确定'
+      confirmText: '确定',
+      cancelText: this.calculationHistory.length > 0 ? '清空' : undefined,
+      onCancel: this.calculationHistory.length > 0 ? () => this.clearHistory() : undefined
     })
+  }
+
+  clearHistory(): void {
+    this.showInlineDialog({
+      title: '清空历史',
+      message: '确定要清空所有计算历史吗？',
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: () => this.confirmClearHistory(),
+      onCancel: () => this.showHistory()
+    })
+  }
+
+  private confirmClearHistory(): void {
+    this.calculationHistory = []
+    this.lastResult = ''
+    
+    this.storageManager.saveCalculationHistory([])
+      .then(() => {
+        console.log('[存储] 计算历史已清空')
+        this.audioManager.speakText('历史记录已清空')
+      })
+      .catch((error: Error) => {
+        console.error('[存储] 清空计算历史失败:', error)
+      })
   }
 
   build() {
