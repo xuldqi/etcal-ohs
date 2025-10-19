@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "专为儿童设计的智能语音计算器，支持语音输入数学表达式，提供学习报告和个性化语音设置"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "儿童语音计算器主界面，提供语音计算、学习报告、语音设置等功能"
     },
     {
       "name": "EntryAbility_label",
@@ -14,7 +14,7 @@
     },
     {
       "name": "microphone_permission_reason",
-      "value": "此应用需要麦克风权限以支持语音计算功能"
+      "value": "此应用需要麦克风权限以支持语音计算功能，让儿童通过语音输入数学表达式进行计算"
     }
   ]
 }
