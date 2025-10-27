@@ -1,30 +1,26 @@
-# HarmonyOS项目忽略文件
+# HarmonyOS SDK
+sdk/
 
-# 构建输出
+# Build outputs
 build/
-outputs/
-*.hap
-*.app
+entry/build/
+.hvigor/
 
-# 临时文件
-*.tmp
-*.temp
-*.log
+# Node modules
+node_modules/
+oh_modules/
 
-# IDE文件
-.vscode/
+# IDE files
 .idea/
-*.swp
-*.swo
+.vscode/
 
-# 系统文件
+# OS files
 .DS_Store
 Thumbs.db
 
-# Node.js (如果有)
-node_modules/
-npm-debug.log*
+# Logs
+*.log
 
-# 其他
-*.bak
-*.backup
+# Temporary files
+*.tmp
+*.temp
