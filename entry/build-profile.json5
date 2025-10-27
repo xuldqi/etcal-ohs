@@ -15,14 +15,20 @@
           }
         }
       }
-    },
+    }
   ],
   "targets": [
     {
       "name": "default"
     },
     {
-      "name": "ohosTest",
+      "name": "hos5Compat"
+    },
+    {
+      "name": "hos4Compat"
+    },
+    {
+      "name": "ohosTest"
     }
   ]
 }

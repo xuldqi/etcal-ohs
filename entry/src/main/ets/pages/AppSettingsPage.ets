@@ -24,8 +24,33 @@ interface SettingsItem {
 @Component
 export struct AppSettingsPage {
   onNavigate: (page: string) => void = () => {}
+  openContentId: string = ''
+  onOpened?: () => void = undefined
+  onBackToHome?: () => void = undefined
+  @Prop fromPrivacyDialog: boolean = false
 
   @State selectedItem: SettingsItem | null = null
+  @State pageTitle: string = '设置'
+  private openedDirectly: boolean = false
+
+  aboutToAppear() {
+    if (this.openContentId) {
+      const targetItem = this.items.find(item => item.id === this.openContentId)
+      if (targetItem) {
+        this.selectedItem = targetItem
+        this.openedDirectly = true
+        this.pageTitle = targetItem.content?.title || targetItem.title
+      }
+    } else {
+      this.pageTitle = '设置'
+    }
+    
+    if (this.onOpened) {
+      setTimeout(() => {
+        this.onOpened?.()
+      }, 0)
+    }
+  }
 
   private items: SettingsItem[] = [
     {
@@ -60,7 +85,7 @@ export struct AppSettingsPage {
           },
           {
             title: '6. 儿童信息保护',
-            content: '应用无需注册账号，不提供广告、应用内购买和第三方统计 SDK。监护人可随时在设置页选择“清除学习数据”删除本机记录。'
+            content: '应用无需注册账号，不提供广告、应用内购买和第三方统计 SDK。监护人可随时在设置页选择"清除学习数据"删除本机记录。\n\n有关14周岁以下儿童隐私保护的详细说明，请访问我们的儿童隐私政策页面：\nhttps://tsto.bambumoon.cn/children-privacy-policy.html'
           },
           {
             title: '7. 您的权利',
@@ -232,6 +257,7 @@ export struct AppSettingsPage {
     } else {
       // 信息类型，展示内容面板
       this.selectedItem = item
+      this.pageTitle = item.content?.title || item.title
     }
   }
 
@@ -289,27 +315,7 @@ export struct AppSettingsPage {
   @Builder
   ContentPanel(item: SettingsItem) {
     Column({ space: 16 }) {
-      // 标题栏
-      Row({ space: 12 }) {
-        Column() {
-          Text(item.icon)
-            .fontSize(24)
-        }
-        .width(48)
-        .height(48)
-        .backgroundColor(item.color)
-        .borderRadius(12)
-        .justifyContent(FlexAlign.Center)
-
-        Text(item.content?.title || item.title)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#1f2937')
-      }
-      .width('100%')
-      .padding({ bottom: 8 })
-
-      // 内容区域
+      // 内容区域（标题已在UnifiedHeader中显示，这里不再重复）
       if (item.content?.sections) {
         ForEach(item.content.sections, (section: SettingsSection) => {
           Column({ space: 8 }) {
@@ -341,7 +347,18 @@ export struct AppSettingsPage {
           .backgroundColor('#6b7280')
           .borderRadius(12)
           .padding({ left: 24, right: 24, top: 10, bottom: 10 })
-          .onClick(() => { this.selectedItem = null })
+          .onClick(() => {
+            if (this.openedDirectly && this.fromPrivacyDialog) {
+              this.openedDirectly = false
+              if (this.onBackToHome) {
+                this.onBackToHome()
+              }
+            } else {
+              this.selectedItem = null
+              this.pageTitle = '设置'
+              this.openedDirectly = false
+            }
+          })
       }
       .width('100%')
       .margin({ top: 8 })
@@ -357,19 +374,40 @@ export struct AppSettingsPage {
     Column() {
         // 统一标题栏
         UnifiedHeader({
-          title: '设置',
-          onBack: () => { this.onNavigate('home') }
+          title: this.pageTitle,
+          onBack: () => {
+            if (this.selectedItem) {
+              if (this.openedDirectly && this.fromPrivacyDialog) {
+                this.openedDirectly = false
+                if (this.onBackToHome) {
+                  this.onBackToHome()
+                }
+              } else {
+                this.selectedItem = null
+                this.pageTitle = '设置'
+                this.openedDirectly = false
+              }
+            } else {
+              if (this.onBackToHome) {
+                this.onBackToHome()
+              } else {
+                this.onNavigate('home')
+              }
+            }
+          }
         })
 
       Scroll() {
         Column({ space: 16 }) {
-          // 副标题
-          Text('了解更多关于儿童语音计算器的信息')
-            .fontSize(15)
-            .fontColor('#6b7280')
-            .textAlign(TextAlign.Center)
-            .width('100%')
-            .margin({ top: 8, bottom: 8 })
+          // 副标题（只在主页面显示）
+          if (this.selectedItem === null) {
+            Text('了解更多关于儿童语音计算器的信息')
+              .fontSize(15)
+              .fontColor('#6b7280')
+              .textAlign(TextAlign.Center)
+              .width('100%')
+              .margin({ top: 8, bottom: 8 })
+          }
 
           // 内容区域
           if (this.selectedItem !== null) {
@@ -400,7 +438,7 @@ export struct AppSettingsPage {
               .borderRadius(20)
               .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
 
-              Text('儿童语音计算器 v1.0.0 | 让学习更有趣')
+              Text('儿童语音计算器 v1.1.1 | 让学习更有趣')
                 .fontSize(12)
                 .fontColor('#9ca3af')
             }

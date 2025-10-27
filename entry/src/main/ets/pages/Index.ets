@@ -53,6 +53,8 @@ struct Index {
   @State showPrivacyDialog: boolean = false
   @State hasAgreedPrivacy: boolean = false
   @State showPolicyPage: string = ''
+  @State selectedSettingsContentId: string = '' // 设置页面要打开的内容ID
+  @State returnToPrivacyDialog: boolean = false // 返回时是否显示隐私弹窗
   private privacyChecked: boolean = false // 'privacy' | 'agreement' | ''
   @State learningStats: LearningStats = {
     totalProblems: 0,
@@ -77,6 +79,7 @@ struct Index {
   ]
 
   aboutToAppear() {
+    // 获取屏幕信息和上下文
     try {
       const defaultDisplay = display.getDefaultDisplaySync()
       this.screenWidth = defaultDisplay.width
@@ -99,12 +102,29 @@ struct Index {
         console.error('获取页面上下文失败:', error)
       }
     }
-    if (this.abilityContext) {
-      void StorageManager.getInstance().init(this.abilityContext)
-    }
     
-    // 检查隐私说明同意状态
-    this.checkPrivacyAgreement()
+    // 初始化存储管理器并检查隐私同意状态
+    this.initStorageAndCheckPrivacy()
+  }
+
+  // 初始化存储并检查隐私状态
+  private async initStorageAndCheckPrivacy() {
+    try {
+      // 初始化存储管理器
+      if (this.abilityContext) {
+        await StorageManager.getInstance().init(this.abilityContext)
+        console.log('[隐私] 存储管理器初始化完成')
+      }
+      
+      // 检查隐私同意状态
+      await this.checkPrivacyAgreement()
+    } catch (error) {
+      console.error('[隐私] 初始化存储失败:', error)
+      // 如果初始化失败，显示隐私弹窗
+      setTimeout(() => {
+        this.showPrivacyDialog = true
+      }, 500)
+    }
   }
 
   // 检查隐私说明同意状态
@@ -151,6 +171,12 @@ struct Index {
   // 同意隐私说明
   private async agreePrivacy() {
     try {
+      // 用户同意后，初始化存储管理器
+      if (this.abilityContext) {
+        await StorageManager.getInstance().init(this.abilityContext)
+      }
+      
+      // 保存隐私同意状态
       const storageManager = StorageManager.getInstance()
       await storageManager.setPrivacyAgreement(true)
       this.hasAgreedPrivacy = true
@@ -183,14 +209,39 @@ struct Index {
     }
   }
 
+  // 跳转到设置页面并打开指定内容
+  private showContentFromSettings(contentId: string) {
+    console.log('[首页] showContentFromSettings - 当前 showPrivacyDialog:', this.showPrivacyDialog)
+    
+    // 如果当前显示隐私弹窗，记录来源并隐藏弹窗，以便内容页面显示在上面
+    if (this.showPrivacyDialog) {
+      this.returnToPrivacyDialog = true
+      this.showPrivacyDialog = false // 隐藏弹窗，让内容页面显示
+      console.log('[首页] 从隐私弹窗跳转，隐藏弹窗，设置 returnToPrivacyDialog = true')
+    } else {
+      this.returnToPrivacyDialog = false
+      console.log('[首页] 不是从隐私弹窗跳转，设置 returnToPrivacyDialog = false')
+    }
+    
+    // 跳转到设置页面
+    this.navigateToPage('settings')
+    // 设置要打开的内容ID
+    this.selectedSettingsContentId = contentId
+  }
+
   // 显示隐私说明页面
   private showPrivacyPolicy() {
-    this.showPolicyPage = 'privacy'
+    this.showContentFromSettings('privacy')
+  }
+
+  // 显示儿童隐私说明页面
+  private showChildrenPrivacy() {
+    this.showContentFromSettings('children-privacy')
   }
 
   // 显示用户协议页面
   private showUserAgreement() {
-    this.showPolicyPage = 'agreement'
+    this.showContentFromSettings('terms')
   }
 
   // 关闭政策页面
@@ -287,7 +338,31 @@ struct Index {
         })
       } else if (this.currentPage === 'settings') {
         AppSettingsPage({ 
-          onNavigate: (page: string) => this.navigateToPage(page)
+          onNavigate: (page: string) => this.navigateToPage(page),
+          openContentId: this.selectedSettingsContentId,
+          fromPrivacyDialog: this.returnToPrivacyDialog, // 传递是否来自隐私弹窗
+          onOpened: () => {
+            // AppSettingsPage已打开后重置标志
+            if (this.selectedSettingsContentId) {
+              this.selectedSettingsContentId = ''
+            }
+          },
+          onBackToHome: () => {
+            console.log('[首页] onBackToHome 被调用，returnToPrivacyDialog:', this.returnToPrivacyDialog)
+            // 返回首页
+            this.navigateToPage('home')
+            
+            // 如果是从隐私弹窗跳转过来的，重新显示弹窗
+            if (this.returnToPrivacyDialog) {
+              console.log('[首页] 返回首页，重新显示隐私弹窗')
+              this.returnToPrivacyDialog = false
+              setTimeout(() => {
+                this.showPrivacyDialog = true
+              }, 300)
+            } else {
+              console.log('[首页] 不需要显示隐私弹窗')
+            }
+          }
         })
       } else if (this.currentPage === 'report-issue') {
         ReportIssuePage({ 
@@ -295,14 +370,14 @@ struct Index {
         })
       }
 
-      // 隐私说明同意弹窗 - 最顶层
-      if (this.showPrivacyDialog) {
-        this.PrivacyDialog()
-      }
-
-      // 隐私说明/用户协议页面 - 最顶层
+      // 隐私说明/用户协议页面
       if (this.showPolicyPage !== '') {
         this.PolicyPage()
+      }
+
+      // 隐私说明同意弹窗 - 最顶层（显示在页面内容和链接页面之上）
+      if (this.showPrivacyDialog) {
+        this.PrivacyDialog()
       }
     }
     .width('100%')
@@ -598,138 +673,164 @@ struct Index {
         .height('100%')
         .backgroundColor(Color.Black)
         .opacity(0.45)
-        .zIndex(0)
         .onClick(() => {}) // 阻止点击穿透
 
       // 弹窗内容
-      Column({ space: 20 }) {
+      Column({ space: 8 }) {
         // 标题
         Text('温馨提示')
-          .fontSize(18)
+          .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1f2937')
           .textAlign(TextAlign.Center)
           .width('100%')
+          .margin({ top: 4, bottom: 2 })
 
-        // 内容
-        Column({ space: 16 }) {
-          Text('欢迎使用儿童语音计算器APP！')
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#1f2937')
-            .textAlign(TextAlign.Start)
-            .width('100%')
-
-          Text('我们非常重视您的个人信息和隐私保护，会通过《隐私说明》向您解释如何收集、使用、存储与保护数据，以及您可以行使的权利。')
-            .fontSize(14)
-            .fontColor('#6b7280')
-            .textAlign(TextAlign.Start)
-            .width('100%')
-
-          Text('1、应用无需注册或登录，学习记录仅保存在应用沙箱内，您可在设置中随时清除；')
-            .fontSize(14)
-            .fontColor('#6b7280')
-            .textAlign(TextAlign.Start)
-            .width('100%')
-
-          Text('2、仅在您启用语音计算时申请麦克风权限，语音数据在本地即时识别，不会上传或存储副本；')
-            .fontSize(14)
-            .fontColor('#6b7280')
-            .textAlign(TextAlign.Start)
-            .width('100%')
-
-          Text('3、应用不接入广告与第三方统计服务，也不会访问定位、通讯录等额外权限。')
-            .fontSize(14)
-            .fontColor('#6b7280')
-            .textAlign(TextAlign.Start)
-            .width('100%')
-
-          // 应用特点
-          Column({ space: 8 }) {
-            Text('本应用特点：')
-              .fontSize(14)
+        // 可滚动内容区域
+        Scroll() {
+          Column({ space: 6 }) {
+            Text('欢迎使用儿童语音计算器APP！')
+              .fontSize(13)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#1e40af')
+              .fontColor('#1f2937')
               .textAlign(TextAlign.Start)
               .width('100%')
 
-            Text('• 无需联网与注册即可体验全部学习功能')
-              .fontSize(12)
-              .fontColor('#2563eb')
+            Text('我们非常重视您的个人信息和隐私保护，会通过《隐私说明》向您解释如何收集、使用、存储与保护数据，以及您可以行使的权利。')
+              .fontSize(11)
+              .fontColor('#6b7280')
               .textAlign(TextAlign.Start)
               .width('100%')
+              .lineHeight(16)
 
-            Text('• 仅在使用语音功能时申请麦克风权限')
-              .fontSize(12)
-              .fontColor('#2563eb')
+            Text('1、应用无需注册或登录，学习记录仅保存在应用沙箱内，您可在设置中随时清除；')
+              .fontSize(11)
+              .fontColor('#6b7280')
               .textAlign(TextAlign.Start)
               .width('100%')
+              .lineHeight(16)
 
-            Text('• 学习进度与错题全程本地存储，支持一键清除')
-              .fontSize(12)
-              .fontColor('#2563eb')
+            Text('2、仅在您启用语音计算时申请麦克风权限，语音数据在本地即时识别，不会上传或存储副本；')
+              .fontSize(11)
+              .fontColor('#6b7280')
               .textAlign(TextAlign.Start)
               .width('100%')
+              .lineHeight(16)
+
+            Text('3、应用不接入广告与第三方统计服务，也不会访问定位、通讯录等额外权限。')
+              .fontSize(11)
+              .fontColor('#6b7280')
+              .textAlign(TextAlign.Start)
+              .width('100%')
+              .lineHeight(16)
+
+            // 应用特点
+            Column({ space: 4 }) {
+              Text('本应用特点：')
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#1e40af')
+                .textAlign(TextAlign.Start)
+                .width('100%')
+
+              Text('• 无需联网与注册即可体验全部学习功能')
+                .fontSize(10)
+                .fontColor('#2563eb')
+                .textAlign(TextAlign.Start)
+                .width('100%')
+                .lineHeight(14)
+
+              Text('• 仅在使用语音功能时申请麦克风权限')
+                .fontSize(10)
+                .fontColor('#2563eb')
+                .textAlign(TextAlign.Start)
+                .width('100%')
+                .lineHeight(14)
+
+              Text('• 学习进度与错题全程本地存储，支持一键清除')
+                .fontSize(10)
+                .fontColor('#2563eb')
+                .textAlign(TextAlign.Start)
+                .width('100%')
+                .lineHeight(14)
+            }
+            .width('100%')
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .backgroundColor('#dbeafe')
+            .borderRadius(6)
           }
-          .width('100%')
-          .padding({ left: 12, right: 12, top: 12, bottom: 12 })
-          .backgroundColor('#dbeafe')
-          .borderRadius(8)
-
-          // 协议链接
-          Row({ space: 8 }) {
-            Button('《隐私说明》')
-              .fontSize(12)
-              .fontColor('#3b82f6')
-              .backgroundColor(Color.Transparent)
-              .border({ width: 0 })
-              .onClick(() => this.showPrivacyPolicy())
-
-            Text('|')
-              .fontSize(12)
-              .fontColor('#9ca3af')
-
-            Button('《用户协议》')
-              .fontSize(12)
-              .fontColor('#3b82f6')
-              .backgroundColor(Color.Transparent)
-              .border({ width: 0 })
-              .onClick(() => this.showUserAgreement())
-          }
-          .justifyContent(FlexAlign.Center)
           .width('100%')
         }
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
+
+        // 协议链接
+        Row({ space: 6 }) {
+          Button('《隐私说明》')
+            .fontSize(10)
+            .fontColor('#3b82f6')
+            .backgroundColor(Color.Transparent)
+            .border({ width: 0 })
+            .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+            .onClick(() => this.showPrivacyPolicy())
+
+          Text('|')
+            .fontSize(10)
+            .fontColor('#9ca3af')
+
+          Button('《儿童隐私》')
+            .fontSize(10)
+            .fontColor('#3b82f6')
+            .backgroundColor(Color.Transparent)
+            .border({ width: 0 })
+            .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+            .onClick(() => this.showChildrenPrivacy())
+
+          Text('|')
+            .fontSize(10)
+            .fontColor('#9ca3af')
+
+          Button('《用户协议》')
+            .fontSize(10)
+            .fontColor('#3b82f6')
+            .backgroundColor(Color.Transparent)
+            .border({ width: 0 })
+            .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+            .onClick(() => this.showUserAgreement())
+        }
+        .justifyContent(FlexAlign.Center)
         .width('100%')
+        .padding({ top: 4, bottom: 2 })
 
         // 按钮区域
-        Column({ space: 12 }) {
+        Column({ space: 6 }) {
           Button('同意并进入')
-            .fontSize(16)
+            .fontSize(14)
             .fontColor(Color.White)
             .backgroundColor('#3b82f6')
-            .borderRadius(24)
-            .padding({ left: 24, right: 24, top: 12, bottom: 12 })
+            .borderRadius(18)
+            .padding({ left: 20, right: 20, top: 8, bottom: 8 })
             .width('100%')
             .onClick(() => this.agreePrivacy())
 
           Button('退出')
-            .fontSize(16)
+            .fontSize(13)
             .fontColor('#6b7280')
             .backgroundColor(Color.Transparent)
             .border({ width: 0 })
-            .padding({ left: 24, right: 24, top: 12, bottom: 12 })
+            .padding({ left: 20, right: 20, top: 6, bottom: 6 })
             .width('100%')
             .onClick(() => this.rejectPrivacy())
         }
         .width('100%')
+        .padding({ top: 4, bottom: 4 })
       }
       .width('85%')
-      .height('80%')
-      .padding({ left: 24, right: 24, top: 24, bottom: 24 })
+      .height('75%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
       .backgroundColor(Color.White)
       .borderRadius(16)
       .shadow({ radius: 20, color: '#00000030', offsetX: 0, offsetY: 10 })
-      .zIndex(1)
     }
     .width('100%')
     .height('100%')
@@ -760,7 +861,7 @@ struct Index {
 
           Blank()
 
-          Text(this.showPolicyPage === 'privacy' ? '隐私说明' : '用户协议')
+          Text(this.showPolicyPage === 'privacy' ? '隐私说明' : (this.showPolicyPage === 'children-privacy' ? '儿童隐私' : '用户协议'))
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor('#1f2937')
@@ -782,6 +883,8 @@ struct Index {
         // 内容区域
         if (this.showPolicyPage === 'privacy') {
           this.PrivacyPolicyContent()
+        } else if (this.showPolicyPage === 'children-privacy') {
+          this.ChildrenPrivacyContent()
         } else if (this.showPolicyPage === 'agreement') {
           this.UserAgreementContent()
         }
@@ -934,6 +1037,113 @@ struct Index {
             .width('100%')
 
           Text('本说明如有重大变更，我们将在应用内弹窗或更新日志中提示。开发者：安徽通拓电子商务有限公司，联系方式：novcat@colletools.com。')
+            .fontSize(14)
+            .fontColor('#374151')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .scrollBar(BarState.Auto)
+    .scrollBarColor(Color.Transparent)
+    .scrollBarWidth(0)
+  }
+
+  // 儿童隐私内容
+  @Builder
+  ChildrenPrivacyContent(): void {
+    Scroll() {
+      Column({ space: 20 }) {
+        Text('儿童隐私说明')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#1f2937')
+          .textAlign(TextAlign.Start)
+          .width('100%')
+
+        Column({ space: 12 }) {
+          Text('1. 使用前提示')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1f2937')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+
+          Text('本应用为3-12岁儿童设计，建议在监护人同意并陪同下使用。我们不会要求儿童填写真实姓名、联系方式等身份信息。')
+            .fontSize(14)
+            .fontColor('#374151')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+
+        Column({ space: 12 }) {
+          Text('2. 收集与不收集')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1f2937')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+
+          Text('仅在本机保存练习成绩、错题本、语音听写记录等学习数据；不收集精确定位、相册、摄像头、通讯录、生物识别等敏感信息。')
+            .fontSize(14)
+            .fontColor('#374151')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+
+        Column({ space: 12 }) {
+          Text('3. 使用目的与限制')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1f2937')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+
+          Text('所有数据只用于改进学习体验与难度推荐，不用于广告投放或跨应用追踪。应用不含社交分享、评论区、社区等功能。')
+            .fontSize(14)
+            .fontColor('#374151')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+
+        Column({ space: 12 }) {
+          Text('4. 家长工具')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1f2937')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+
+          Text('监护人可在设置中查看学习报告、手动清除数据或停用语音权限，帮助孩子合理安排学习节奏。')
+            .fontSize(14)
+            .fontColor('#374151')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+
+        Column({ space: 12 }) {
+          Text('5. 反馈渠道')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1f2937')
+            .textAlign(TextAlign.Start)
+            .width('100%')
+
+          Text('若发现不当内容或隐私风险，请立即通过 novcat@colletools.com 联系我们，我们将在15个工作日内处理。')
             .fontSize(14)
             .fontColor('#374151')
             .textAlign(TextAlign.Start)

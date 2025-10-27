@@ -82,6 +82,7 @@ export struct ReportIssuePage {
     .width('100%')
     .height('100%')
     .backgroundColor('#f8fafc')
+    .padding({ bottom: 20 })
   }
 
   // 举报表单
@@ -160,7 +161,7 @@ export struct ReportIssuePage {
             this.submitReport()
           })
       }
-      .padding(20)
+      .padding({ left: 20, right: 20, top: 20, bottom: 100 })
     }
     .width('100%')
     .height('100%')
@@ -290,4 +291,3 @@ export struct ReportIssuePage {
     }, 1000)
   }
 }
-

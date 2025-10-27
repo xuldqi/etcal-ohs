@@ -57,7 +57,7 @@ entry/
 ## 开发环境
 
 ### 系统要求
-- **HarmonyOS SDK**：API 12+
+- **HarmonyOS SDK**：API 11+（默认使用 API 20 构建，也可安装 API 15 与 API 11 以构建向下兼容版本）
 - **DevEco Studio**：最新版本
 - **Node.js**：16.0+
 - **hvigor**：构建工具
@@ -80,6 +80,12 @@ entry/
 
 # 安装到设备
 hdc install -r entry-default-unsigned.hap
+
+# 针对 HarmonyOS 5 的向下兼容构建
+./hvigorw --mode module -p module=entry@default -p product=hos5Compat -p buildMode=release assembleHap
+
+# 针对 HarmonyOS 4 的向下兼容构建
+./hvigorw --mode module -p module=entry@default -p product=hos4Compat -p buildMode=release assembleHap
 ```
 
 ## 贡献指南

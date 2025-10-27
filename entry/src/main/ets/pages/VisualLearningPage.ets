@@ -39,6 +39,7 @@ export struct VisualLearningPage {
   @State showCelebration: boolean = false
 
   private audioManager: AudioManager = new AudioManager()
+  private nextQuestionTimer?: number
   private questionTemplates: VisualTemplate[] = [
     { object: '小猫', emoji: '🐱', quantifier: '只' },
     { object: '苹果', emoji: '🍎', quantifier: '个' },
@@ -54,10 +55,54 @@ export struct VisualLearningPage {
     this.prepareQuestion()
   }
 
+  aboutToDisappear() {
+    this.clearNextQuestionTimer()
+  }
+
+  private clearNextQuestionTimer() {
+    if (this.nextQuestionTimer !== undefined) {
+      clearTimeout(this.nextQuestionTimer)
+      this.nextQuestionTimer = undefined
+    }
+  }
+
+  private scheduleNextQuestion(delayMs: number, beforeNext?: () => void) {
+    this.clearNextQuestionTimer()
+    this.nextQuestionTimer = setTimeout(() => {
+      if (beforeNext) {
+        beforeNext()
+      }
+      this.prepareQuestion()
+      this.nextQuestionTimer = undefined
+    }, delayMs)
+  }
+
   private prepareQuestion() {
-    const templateIndex = Math.floor(Math.random() * this.questionTemplates.length)
+    this.clearNextQuestionTimer()
+    
+    // 确保每次换题时，emoji和运算符号都会变化
+    let templateIndex: number
+    let randomType: 'addition' | 'subtraction'
+    
+    if (this.currentQuestion) {
+      // 强制选择不同的模板 - 基于object而不是emoji
+      let currentTemplateIndex = this.questionTemplates.findIndex(t => t.object === this.currentQuestion!.object)
+      if (currentTemplateIndex === -1) {
+        // 如果找不到当前模板，随机选择
+        templateIndex = Math.floor(Math.random() * this.questionTemplates.length)
+      } else {
+        templateIndex = (currentTemplateIndex + 1) % this.questionTemplates.length
+      }
+      
+      // 强制选择不同的运算类型
+      randomType = this.currentQuestion.type === 'addition' ? 'subtraction' : 'addition'
+    } else {
+      // 第一次生成，随机选择
+      templateIndex = Math.floor(Math.random() * this.questionTemplates.length)
+      randomType = Math.random() > 0.3 ? 'addition' : 'subtraction'
+    }
+    
     const template = this.questionTemplates[templateIndex]
-    const randomType = Math.random() > 0.3 ? 'addition' : 'subtraction'
 
     let num1 = 0
     let num2 = 0
@@ -70,6 +115,9 @@ export struct VisualLearningPage {
     } else {
       num1 = Math.floor(Math.random() * 8) + 3
       num2 = Math.floor(Math.random() * num1) + 1
+      if (num2 > num1) {
+        num2 = num1
+      }
       answer = num1 - num2
     }
 
@@ -84,8 +132,17 @@ export struct VisualLearningPage {
       answer: answer
     }
 
-    const generatedOptions = this.generateOptions(answer)
+    console.log(`[学数学] 新题目: ${newQuestion.emoji} ${newQuestion.num1} ${newQuestion.type === 'addition' ? '+' : '-'} ${newQuestion.num2} = ${newQuestion.answer}`)
+    console.log(`[学数学] 模板: ${template.object} ${template.emoji} ${template.quantifier}`)
+    console.log(`[学数学] 运算类型: ${randomType}`)
+    console.log(`[学数学] 当前题目类型: ${this.currentQuestion?.type}`)
+    console.log(`[学数学] 新题目类型: ${newQuestion.type}`)
+    console.log(`[学数学] 新题目object: ${newQuestion.object}`)
+    console.log(`[学数学] 新题目emoji: ${newQuestion.emoji}`)
 
+    const generatedOptions = this.generateOptions(newQuestion.answer)
+
+    // 强制状态更新，确保UI重新渲染
     this.currentQuestion = newQuestion
     this.options = generatedOptions
     this.selectedAnswer = -1
@@ -93,16 +150,19 @@ export struct VisualLearningPage {
     this.isCorrect = false
     this.showCelebration = false
 
-    const description = randomType === 'addition'
-      ? `${num1}${template.quantifier}${template.object}加上${num2}${template.quantifier}${template.object}等于多少`
-      : `${num1}${template.quantifier}${template.object}减去${num2}${template.quantifier}${template.object}等于多少`
+    const description = newQuestion.type === 'addition'
+      ? `${newQuestion.num1}${newQuestion.quantifier}${newQuestion.object}加上${newQuestion.num2}${newQuestion.quantifier}${newQuestion.object}等于多少`
+      : `${newQuestion.num1}${newQuestion.quantifier}${newQuestion.object}减去${newQuestion.num2}${newQuestion.quantifier}${newQuestion.object}等于多少`
     this.audioManager.speakText(description)
   }
 
   private generateOptions(correctAnswer: number): number[] {
     const optionList: number[] = [correctAnswer]
+    let attempts = 0
+    const maxAttempts = 20 // 防止无限循环
 
-    while (optionList.length < 4) {
+    while (optionList.length < 4 && attempts < maxAttempts) {
+      attempts++
       const randomOffset = Math.floor(Math.random() * 6) - 3
       let candidate = correctAnswer + randomOffset
       if (candidate < 0) {
@@ -118,6 +178,12 @@ export struct VisualLearningPage {
       if (!duplicated) {
         optionList.push(candidate)
       }
+    }
+
+    // 如果仍然不够4个选项，用简单的方式补充
+    while (optionList.length < 4) {
+      const candidate = correctAnswer + optionList.length
+      optionList.push(candidate)
     }
 
     for (let i = optionList.length - 1; i > 0; i--) {
@@ -150,15 +216,12 @@ export struct VisualLearningPage {
     if (correct) {
       this.audioManager.speakText('回答正确，真棒！')
       this.showCelebration = true
-      setTimeout(() => {
+      this.scheduleNextQuestion(2000, () => {
         this.showCelebration = false
-        this.prepareQuestion()
-      }, 2000)
+      })
     } else {
       this.audioManager.speakText(`答错了，正确答案是 ${this.currentQuestion.answer}`)
-      setTimeout(() => {
-        this.prepareQuestion()
-      }, 2000)
+      this.scheduleNextQuestion(2000)
     }
   }
 
@@ -179,12 +242,12 @@ export struct VisualLearningPage {
   }
 
   @Builder
-  RenderEmojiRow(count: number, emoji: string) {
+  RenderEmojiRow(questionId: number, count: number, emoji: string) {
     Row({ space: 8 }) {
-      ForEach(this.createIndexArray(count), (_index: number) => {
+      ForEach(this.createIndexArray(count), (index: number) => {
         Text(emoji)
           .fontSize(32)
-      })
+      }, (index: number) => `${questionId}-${emoji}-${index}`)
     }
     .justifyContent(FlexAlign.Center)
   }
@@ -201,9 +264,17 @@ export struct VisualLearningPage {
       .justifyContent(FlexAlign.Center)
     } else {
       Column({ space: 16 }) {
-        this.RenderEmojiRow(this.currentQuestion.num1, this.currentQuestion.emoji)
+        // 第一组emoji
+        Row({ space: 8 }) {
+          ForEach(this.createIndexArray(this.currentQuestion!.num1), (index: number) => {
+            Text(this.currentQuestion!.emoji)
+              .fontSize(32)
+          }, (index: number) => `${this.currentQuestion!.id}-first-${this.currentQuestion!.emoji}-${index}`)
+        }
+        .justifyContent(FlexAlign.Center)
 
-        if (this.currentQuestion.type === 'addition') {
+        // 运算符号
+        if (this.currentQuestion!.type === 'addition') {
           Text('+')
             .fontSize(24)
             .fontColor('#475569')
@@ -215,9 +286,17 @@ export struct VisualLearningPage {
             .textAlign(TextAlign.Center)
         }
 
-        this.RenderEmojiRow(this.currentQuestion.num2, this.currentQuestion.emoji)
+        // 第二组emoji
+        Row({ space: 8 }) {
+          ForEach(this.createIndexArray(this.currentQuestion!.num2), (index: number) => {
+            Text(this.currentQuestion!.emoji)
+              .fontSize(32)
+          }, (index: number) => `${this.currentQuestion!.id}-second-${this.currentQuestion!.emoji}-${index}`)
+        }
+        .justifyContent(FlexAlign.Center)
 
-        Text(`一共有多少${this.currentQuestion.quantifier}${this.currentQuestion.object}？`)
+        // 问题文本
+        Text(`一共有多少${this.currentQuestion!.quantifier}${this.currentQuestion!.object}？`)
           .fontSize(16)
           .fontColor('#1f2937')
           .textAlign(TextAlign.Center)

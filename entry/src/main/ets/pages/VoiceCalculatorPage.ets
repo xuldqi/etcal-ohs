@@ -766,19 +766,24 @@ export struct VoiceCalculatorPage {
         // 统一标题栏
         UnifiedHeader({
           title: '语音计算器',
-          onBack: () => { this.onNavigate('home') }
+          onBack: () => { this.onNavigate('home') },
+          rightButtonText: '历史记录',
+          rightButtonColor: '#2C7A4B',
+          rightButtonBgColor: '#EEF8F2',
+          onRightButtonClick: () => this.showHistory()
         })
 
-        if (this.voiceStatus !== '点击语音按钮开始语音计算') {
-          Text(this.voiceStatus)
-            .fontSize(14)
-            .fontColor('#34495E')
-            .textAlign(TextAlign.Center)
-            .width('90%')
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .backgroundColor('#E8F4FD')
-            .borderRadius(15)
-        }
+        // 语音状态显示已隐藏
+        // if (this.voiceStatus !== '点击语音按钮开始语音计算') {
+        //   Text(this.voiceStatus)
+        //     .fontSize(14)
+        //     .fontColor('#34495E')
+        //     .textAlign(TextAlign.Center)
+        //     .width('90%')
+        //     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+        //     .backgroundColor('#E8F4FD')
+        //     .borderRadius(15)
+        // }
 
         if (this.showError) {
           Text(this.errorMessage)
@@ -799,16 +804,17 @@ export struct VoiceCalculatorPage {
             })
         }
 
-        if (this.voiceResult) {
-          Text(this.voiceResult)
-            .fontSize(14)
-            .fontColor('#2C7A4B')
-            .textAlign(TextAlign.Center)
-            .width('90%')
-            .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-            .backgroundColor('#E4F6EC')
-            .borderRadius(15)
-        }
+        // 语音结果显示已隐藏
+        // if (this.voiceResult) {
+        //   Text(this.voiceResult)
+        //     .fontSize(14)
+        //     .fontColor('#2C7A4B')
+        //     .textAlign(TextAlign.Center)
+        //     .width('90%')
+        //     .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+        //     .backgroundColor('#E4F6EC')
+        //     .borderRadius(15)
+        // }
 
         Column() {
           if (this.expression) {
@@ -841,22 +847,24 @@ export struct VoiceCalculatorPage {
         })
         .margin({ top: 8, bottom: 8 })
 
-        Row({ space: 14 }) {
-          this.UtilityButton(
-            this.isListening ? '正在聆听...' : '语音输入',
-            this.isListening ? '#FFE8EA' : '#EEF1FF',
-            () => { this.toggleVoiceRecognition() },
-            this.isListening ? '#E53935' : '#3455D1'
-          )
-          this.UtilityButton(
-            '历史记录',
-            '#EEF8F2',
-            () => this.showHistory(),
-            '#2C7A4B'
-          )
-        }
-        .width('90%')
-        .margin({ top: 12 })
+        // 历史记录按钮已移至右上角
+        // Row({ space: 14 }) {
+        //   // 语音输入按钮已隐藏
+        //   // this.UtilityButton(
+        //   //   this.isListening ? '正在聆听...' : '语音输入',
+        //   //   this.isListening ? '#FFE8EA' : '#EEF1FF',
+        //   //   () => { this.toggleVoiceRecognition() },
+        //   //   this.isListening ? '#E53935' : '#3455D1'
+        //   // )
+        //   this.UtilityButton(
+        //     '历史记录',
+        //     '#EEF8F2',
+        //     () => this.showHistory(),
+        //     '#2C7A4B'
+        //   )
+        // }
+        // .width('90%')
+        // .margin({ top: 12 })
 
         Column({ space: 12 }) {
           Row({ space: 12 }) {

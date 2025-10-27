@@ -1,23 +1,51 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "/Users/macmima1234/Documents/harmony/chmath/OHS/chmath.p12",
+          "storePassword": "0000001852BDE889E75CE3D158FC019B8B220EECD8451D3B719364F1617923E563C2A20D932D0C6F",
+          "keyAlias": "novcat",
+          "keyPassword": "000000184F81C37274F8CF6BD9F3FA4498C4E9D5CA6B1767634E04AB67ADEC389CD8A8E42A7BE63D",
+          "signAlg": "SHA256withECDSA",
+          "profile": "/Users/macmima1234/Documents/harmony/chmath/OHS/chmathRelease.p7b",
+          "certpath": "/Users/macmima1234/Documents/harmony/chmath/OHS/chmath.cer"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
+        "compileSdkVersion": "6.0.0(20)",
+        "targetSdkVersion": "6.0.0(20)",
+        "compatibleSdkVersion": "5.0.0(12)",
+        "runtimeOS": "HarmonyOS",
+        "signingConfig": "default",
+        "buildOption": {
+          "strictMode": {
+            "noExternalImportByPath": true
+          }
+        }
+      },
+      {
+        "name": "hos5Compat",
+        "compileSdkVersion": "5.0.0(12)",
         "targetSdkVersion": "5.0.0(12)",
         "compatibleSdkVersion": "5.0.0(12)",
         "runtimeOS": "HarmonyOS",
+        "signingConfig": "default",
         "buildOption": {
           "strictMode": {
-            "caseSensitiveCheck": true,
-            "useNormalizedOHMUrl": true
+            "noExternalImportByPath": true
           }
         }
       }
     ],
     "buildModeSet": [
       {
-        "name": "debug",
+        "name": "debug"
       },
       {
         "name": "release"
@@ -33,6 +61,12 @@
           "name": "default",
           "applyToProducts": [
             "default"
+          ]
+        },
+        {
+          "name": "hos5Compat",
+          "applyToProducts": [
+            "hos5Compat"
           ]
         }
       ]
