@@ -829,6 +829,14 @@ export struct VoiceSettingsPage {
   private async playAudio(item: AudioItem) {
     console.info(`[试听] ===== 开始试听流程 =====`)
     console.info(`[试听] 项目: ${item.label}, 方案: ${this.selectedScheme?.id}`)
+    
+    // 检查语音是否开启
+    if (!this.isAudioEnabled) {
+      console.warn('[试听] 语音播报已关闭')
+      this.setStatus('⚠️ 请先开启语音播报开关', true, 3000)
+      return
+    }
+    
     const schemeId = this.selectedScheme?.id
 
     if (!schemeId) {
