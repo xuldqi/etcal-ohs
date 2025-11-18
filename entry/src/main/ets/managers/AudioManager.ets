@@ -169,13 +169,20 @@ export class AudioManager {
 
   // 语音播报文本
   speakText(text: string) {
-    if (!this.isEnabled || !text) {
+    if (!text) {
+      return
+    }
+    
+    // 检查语音是否启用
+    if (!this.isEnabled) {
+      console.log('[TTS] 语音播报已禁用，跳过:', text)
       return
     }
 
     try {
       // 直接使用TTS播报，避免AVPlayer状态问题
-        this.speakWithTTS(text)
+      this.speakWithTTS(text)
+      console.log('[TTS] 播报文本:', text)
     } catch (error) {
       console.error('语音播报失败:', error)
       // 降级到控制台输出

@@ -435,13 +435,37 @@ struct Index {
 
       // 主内容区域
       Column({ space: 20 }) {
-        // 标题区域
-        Column({ space: 8 }) {
-          Text('儿童语音计算器')
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#2c3e50')
+        // 标题和声音开关区域
+        Row() {
+          Column({ space: 8 }) {
+            Text('儿童语音计算器')
+              .fontSize(28)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#2c3e50')
+          }
+          .layoutWeight(1)
+          
+          // 声音开关按钮
+          Button() {
+            Row({ space: 6 }) {
+              Text(this.isAudioEnabled ? '🔊' : '🔇')
+                .fontSize(20)
+              Text(this.isAudioEnabled ? '声音已开启' : '声音已关闭')
+                .fontSize(12)
+                .fontColor(this.isAudioEnabled ? '#16a34a' : '#6b7280')
+            }
+          }
+          .backgroundColor(this.isAudioEnabled ? '#dcfce7' : '#f3f4f6')
+          .borderRadius(20)
+          .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+          .onClick(() => {
+            this.isAudioEnabled = !this.isAudioEnabled
+            this.audioManager.setEnabled(this.isAudioEnabled)
+            this.audioManager.speakText(this.isAudioEnabled ? '声音已开启' : '声音已关闭')
+          })
         }
+        .width('100%')
+        .padding({ left: 16, right: 16 })
         .margin({ top: 40, bottom: 30 })
 
         // 功能网格
