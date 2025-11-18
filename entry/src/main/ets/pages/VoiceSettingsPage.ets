@@ -143,7 +143,7 @@ export struct VoiceSettingsPage {
     { id: 'bai', label: '百', key: '百', audioPath: 'rawfile/audio/bai.ogg' },
     { id: 'qian', label: '千', key: '千', audioPath: 'rawfile/audio/qian.ogg' },
     { id: 'wan', label: '万', key: '万', audioPath: 'rawfile/audio/wan.ogg' },
-    { id: 'clear', label: '清空', key: 'clear' }, // 没有音频文件，使用TTS
+    { id: 'clear', label: '清空', key: 'clear', audioPath: 'rawfile/audio/del.ogg' },
     { id: 'delete', label: '删除', key: 'delete', audioPath: 'rawfile/audio/del.ogg' }
   ]
 
