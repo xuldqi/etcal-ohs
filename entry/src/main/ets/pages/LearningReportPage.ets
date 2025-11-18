@@ -437,24 +437,36 @@ export struct LearningReportPage {
           .fontColor('#374151')
 
         if (this.dailyProgress.length > 0) {
-          Row({ space: 6 }) {
-            ForEach(this.dailyProgress, (item: DailyProgressItem, index: number) => {
-              Column({ space: 4 }) {
-                Text(item.date.substring(3))
-                  .fontSize(11)
-                  .fontColor('#6b7280')
-                
-                Column()
-                  .width(16)
-                  .height(this.calculateBarHeight(item.questions))
-                  .backgroundColor('#3b82f6')
-                  .borderRadius(3)
-              }
-              .alignItems(HorizontalAlign.Center)
-            })
+          Column({ space: 8 }) {
+            Row({ space: 6 }) {
+              ForEach(this.dailyProgress, (item: DailyProgressItem, index: number) => {
+                Column({ space: 4 }) {
+                  Column()
+                    .width(16)
+                    .height(this.calculateBarHeight(item.questions))
+                    .backgroundColor('#3b82f6')
+                    .borderRadius(3)
+                  
+                  Text(item.date.substring(3))
+                    .fontSize(11)
+                    .fontColor('#6b7280')
+                }
+                .alignItems(HorizontalAlign.Center)
+              })
+            }
+            .justifyContent(FlexAlign.SpaceEvenly)
+            .width('100%')
+            .height(120)
+            .alignItems(VerticalAlign.Bottom)
+            
+            // 显示最近7天总题数
+            Text(`总计: ${this.getTotalQuestions()} 题`)
+              .fontSize(12)
+              .fontColor('#6b7280')
+              .textAlign(TextAlign.Center)
+              .width('100%')
+              .margin({ top: 8 })
           }
-          .justifyContent(FlexAlign.SpaceEvenly)
-          .width('100%')
         } else {
           Text('暂无学习数据')
             .fontSize(13)
@@ -477,24 +489,36 @@ export struct LearningReportPage {
           .fontColor('#374151')
 
         if (this.dailyProgress.length > 0) {
-          Row({ space: 6 }) {
-            ForEach(this.dailyProgress, (item: DailyProgressItem, index: number) => {
-              Column({ space: 4 }) {
-                Text(item.date.substring(3))
-                  .fontSize(11)
-                  .fontColor('#6b7280')
-                
-                Column()
-                  .width(16)
-                  .height(this.calculateBarHeightFromMinutes(item.minutes))
-                  .backgroundColor('#22c55e')
-                  .borderRadius(3)
-              }
-              .alignItems(HorizontalAlign.Center)
-            })
+          Column({ space: 8 }) {
+            Row({ space: 6 }) {
+              ForEach(this.dailyProgress, (item: DailyProgressItem, index: number) => {
+                Column({ space: 4 }) {
+                  Column()
+                    .width(16)
+                    .height(this.calculateBarHeightFromMinutes(item.minutes))
+                    .backgroundColor('#22c55e')
+                    .borderRadius(3)
+                  
+                  Text(item.date.substring(3))
+                    .fontSize(11)
+                    .fontColor('#6b7280')
+                }
+                .alignItems(HorizontalAlign.Center)
+              })
+            }
+            .justifyContent(FlexAlign.SpaceEvenly)
+            .width('100%')
+            .height(100)
+            .alignItems(VerticalAlign.Bottom)
+            
+            // 显示最近7天总学习时长
+            Text(`总计: ${this.getTotalMinutes()} 分钟`)
+              .fontSize(12)
+              .fontColor('#6b7280')
+              .textAlign(TextAlign.Center)
+              .width('100%')
+              .margin({ top: 8 })
           }
-          .justifyContent(FlexAlign.SpaceEvenly)
-          .width('100%')
         } else {
           Text('暂无学习数据')
             .fontSize(13)
