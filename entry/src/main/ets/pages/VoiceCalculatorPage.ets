@@ -232,6 +232,10 @@ export struct VoiceCalculatorPage {
 
     this.appendHistory(displayExpression, formattedResult)
     this.playResultAudio(formattedResult, equalsQuery)
+    
+    // 记录学习数据：1题，100%正确，估计5秒时长
+    this.storageManager.updateStudyStats(1, 1, 5)
+      .catch((error: Error) => console.error('记录学习数据失败:', error))
   }
 
   private populateCalculatorFromExpression(expression: string): void {
