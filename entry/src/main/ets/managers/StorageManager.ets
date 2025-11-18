@@ -294,6 +294,9 @@ export class StorageManager {
     }
 
     await this.saveStudyStats(stats)
+    
+    // 同时更新每日进度
+    await this.updateDailyProgress(questionsAnswered, correctAnswers, timeSpent)
   }
 
   private getDateString(offset: number): string {
@@ -391,6 +394,38 @@ export class StorageManager {
 
   async saveDailyProgress(progress: DailyProgress[]): Promise<void> {
     await this.setItem(DAILY_PROGRESS_KEY, JSON.stringify(progress))
+  }
+  
+  // 更新每日进度，在每次答题后自动调用
+  async updateDailyProgress(questionsAnswered: number, correctAnswers: number, timeSpent: number): Promise<void> {
+    const today = this.getDateString(0)
+    const progress = await this.loadDailyProgress()
+    
+    // 查找今天的记录
+    let todayProgress = progress.find(p => p.date === today)
+    
+    if (todayProgress) {
+      // 更新今天的记录
+      todayProgress.questionsAnswered += questionsAnswered
+      const totalCorrect = Math.round(todayProgress.correctRate * todayProgress.questionsAnswered / 100) + correctAnswers
+      todayProgress.correctRate = Math.round((totalCorrect / todayProgress.questionsAnswered) * 100)
+      todayProgress.timeSpent += timeSpent
+      todayProgress.sessions += 1
+    } else {
+      // 创建今天的记录
+      const correctRate = questionsAnswered > 0 ? Math.round((correctAnswers / questionsAnswered) * 100) : 0
+      todayProgress = {
+        date: today,
+        questionsAnswered: questionsAnswered,
+        correctRate: correctRate,
+        timeSpent: timeSpent,
+        sessions: 1
+      }
+      progress.push(todayProgress)
+    }
+    
+    await this.saveDailyProgress(progress)
+    console.log(`[存储] 更新每日进度: ${today}, 题目: ${todayProgress.questionsAnswered}, 正确率: ${todayProgress.correctRate}%`)
   }
 
   async loadWrongQuestions(): Promise<WrongQuestion[]> {
