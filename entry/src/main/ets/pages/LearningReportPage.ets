@@ -66,6 +66,7 @@ export struct LearningReportPage {
     division: 0,
     reviewed: 0
   }
+  @State totalWrongQuestionsCount: number = 0 // 错题总数
   
   // 错题重练模式状态
   @State practiceMode: boolean = false
@@ -160,9 +161,14 @@ export struct LearningReportPage {
     
     // 加载错题列表
     const wrongQuestions = await this.storageManager.loadWrongQuestions()
-    this.wrongQuestions = wrongQuestions
-      .filter(q => !q.mastered)
-      .slice(0, 10) // 只显示前10个未掌握的错题
+    const unmasteredQuestions = wrongQuestions.filter(q => !q.mastered)
+    
+    // 保存错题总数
+    this.totalWrongQuestionsCount = unmasteredQuestions.length
+    
+    // 只显示前10个未掌握的错题用于列表展示
+    this.wrongQuestions = unmasteredQuestions
+      .slice(0, 10)
       .map(q => {
         const item: WrongQuestionItem = {
           id: q.id,
@@ -558,14 +564,14 @@ export struct LearningReportPage {
     Column({ space: 12 }) {
       // 错题统计
       Row({ space: 12 }) {
-        this.MetricCard('错题总数', `${this.wrongQuestions.length} 道`, '#ef4444')
+        this.MetricCard('错题总数', `${this.totalWrongQuestionsCount} 道`, '#ef4444')
         this.MetricCard('已复习', `${this.wrongQuestionStats.reviewed} 道`, '#22c55e')
       }
       .width('100%')
       
       // 错题类型统计（可点击筛选）
       Row({ space: 8 }) {
-        this.MistakeTypeCard('全部', `${this.wrongQuestions.length}`, '#6b7280', 'all')
+        this.MistakeTypeCard('全部', `${this.totalWrongQuestionsCount}`, '#6b7280', 'all')
         this.MistakeTypeCard('加法', `${this.wrongQuestionStats.addition}`, '#f59e0b', 'addition')
         this.MistakeTypeCard('减法', `${this.wrongQuestionStats.subtraction}`, '#10b981', 'subtraction')
         this.MistakeTypeCard('乘法', `${this.wrongQuestionStats.multiplication}`, '#a855f7', 'multiplication')
