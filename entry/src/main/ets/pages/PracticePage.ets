@@ -1,5 +1,7 @@
 import { AudioManager } from '../managers/AudioManager'
 import { UnifiedHeader } from '../components/UnifiedHeader'
+import { StorageManager, WrongQuestion } from '../managers/StorageManager'
+import common from '@ohos.app.ability.common'
 
 // 学习统计接口
 interface LearningStats {
@@ -31,6 +33,7 @@ export struct PracticePage {
   onNavigate: (page: string) => void = () => {}
   @Prop learningStats: LearningStats
   updateStats: (stats: LearningStats) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
 
   @State currentMode: PracticeMode = 'menu'
   @State currentProblem: MathProblem | null = null
@@ -50,10 +53,44 @@ export struct PracticePage {
   @State celebrationScale: number = 1.0
   @State celebrationOpacity: number = 0
 
-  private audioManager: AudioManager = new AudioManager()
+  private audioManager: AudioManager = AudioManager.getInstance()
+  private storageManager: StorageManager = StorageManager.getInstance()
+  private abilityContext: common.UIAbilityContext | null = null
+  private sessionStartTime: number = 0
 
-  aboutToAppear() {
+  private handleBackNavigation(): boolean {
+    if (this.currentMode === 'menu') {
+      this.onNavigate('home')
+    } else {
+      // 退出前保存当前会话数据
+      if (this.totalProblems > 0) {
+        // 异步保存，不等待结果
+        void this.saveStudyProgress()
+      }
+      this.prepareMode('menu')
+    }
+    return true
+  }
+
+  async aboutToAppear() {
     this.prepareMode('menu')
+    this.registerBackHandler(() => this.handleBackNavigation())
+    try {
+      this.abilityContext = getContext(this) as common.UIAbilityContext
+      if (this.abilityContext) {
+        await this.storageManager.init(this.abilityContext)
+      }
+    } catch (error) {
+      console.error('练习页面初始化存储失败:', error)
+    }
+  }
+
+  async aboutToDisappear() {
+    this.registerBackHandler(null)
+    // 在退出时保存一次学习进度
+    if (this.currentMode !== 'menu' && this.totalProblems > 0) {
+      await this.saveStudyProgress()
+    }
   }
 
   build() {
@@ -63,13 +100,7 @@ export struct PracticePage {
             // 统一标题栏
             UnifiedHeader({
               title: this.getModeTitle(),
-              onBack: () => {
-                if (this.currentMode === 'menu') {
-                  this.onNavigate('home')
-                } else {
-                  this.prepareMode('menu')
-                }
-              }
+              onBack: () => { this.handleBackNavigation() }
             })
 
         Scroll() {
@@ -143,7 +174,7 @@ export struct PracticePage {
     .height('100%')
   }
 
-  private prepareMode(mode: PracticeMode) {
+  private async prepareMode(mode: PracticeMode) {
     this.currentMode = mode
     this.userAnswer = ''
     this.showResult = false
@@ -163,6 +194,7 @@ export struct PracticePage {
       this.score = 0
       this.totalProblems = 0
       this.correctAnswers = 0
+      this.sessionStartTime = Date.now()
       this.generateProblemForMode(mode)
     }
   }
@@ -817,7 +849,7 @@ export struct PracticePage {
     }
   }
 
-  private checkAnswer() {
+  private async checkAnswer() {
     if (!this.currentProblem || this.userAnswer.trim() === '') {
       return
     }
@@ -834,6 +866,8 @@ export struct PracticePage {
       // 触发庆祝动画
       this.triggerCelebration()
     } else {
+      // 保存错题
+      await this.saveWrongQuestion()
       // 先播放鼓励语音，然后播报正确答案
       this.audioManager.speakEncouragement(false)
       setTimeout(() => {
@@ -849,6 +883,124 @@ export struct PracticePage {
       score: this.learningStats.score + (this.isCorrect ? 10 : 0)
     }
     this.updateStats(updatedStats)
+    
+    // 注意：不再每次都保存，改为在退出练习时保存
+  }
+  
+  // 保存错题
+  private async saveWrongQuestion() {
+    if (!this.currentProblem) return
+    
+    try {
+      const wrongQuestions = await this.storageManager.loadWrongQuestions()
+      const today = new Date().toISOString().split('T')[0]
+      
+      // 检查是否已存在相同的错题
+      const existingIndex = wrongQuestions.findIndex(
+        q => q.question === this.currentProblem!.question && q.type === this.getOperatorType(this.currentProblem!.operator)
+      )
+      
+      const wrongQuestion: WrongQuestion = {
+        id: `wrong_${Date.now()}`,
+        question: this.currentProblem.question,
+        userAnswer: this.userAnswer,
+        correctAnswer: String(this.currentProblem.answer),
+        type: this.getOperatorType(this.currentProblem.operator),
+        date: today,
+        reviewCount: 0,
+        mastered: false
+      }
+      
+      if (existingIndex >= 0) {
+        // 更新已存在的错题
+        const existingQuestion = wrongQuestions[existingIndex]
+        wrongQuestions[existingIndex] = {
+          id: existingQuestion.id,
+          question: existingQuestion.question,
+          userAnswer: this.userAnswer,
+          correctAnswer: existingQuestion.correctAnswer,
+          type: existingQuestion.type,
+          date: existingQuestion.date,
+          reviewCount: existingQuestion.reviewCount + 1,
+          mastered: existingQuestion.mastered
+        }
+      } else {
+        // 添加新错题
+        wrongQuestions.push(wrongQuestion)
+      }
+      
+      await this.storageManager.saveWrongQuestions(wrongQuestions)
+      console.log('[存储] 错题已保存')
+    } catch (error) {
+      console.error('[存储] 保存错题失败:', error)
+    }
+  }
+  
+  // 根据运算符获取题目类型
+  private getOperatorType(operator: string): string {
+    switch (operator) {
+      case '+': return 'addition'
+      case '-': return 'subtraction'
+      case '×': return 'multiplication'
+      case '÷': return 'division'
+      default: return 'unknown'
+    }
+  }
+  
+  // 保存学习进度
+  private async saveStudyProgress() {
+    try {
+      // 更新学习统计
+      const timeSpent = Math.max(1, Math.round((Date.now() - this.sessionStartTime) / 1000 / 60)) // 转换为分钟
+      await this.storageManager.updateStudyStats(
+        this.totalProblems,
+        this.correctAnswers,
+        timeSpent
+      )
+      
+      // 更新每日进度
+      const today = new Date().toISOString().split('T')[0]
+      const dailyProgress = await this.storageManager.loadDailyProgress()
+      
+      const todayProgressIndex = dailyProgress.findIndex(p => p.date === today)
+      
+      const correctRate = this.totalProblems > 0 
+        ? Math.round((this.correctAnswers / this.totalProblems) * 100) 
+        : 0
+      
+      if (todayProgressIndex >= 0) {
+        // 更新今日进度 - 累加本次练习的数据
+        dailyProgress[todayProgressIndex].questionsAnswered += this.totalProblems
+        dailyProgress[todayProgressIndex].timeSpent += timeSpent
+        dailyProgress[todayProgressIndex].sessions += 1
+        
+        // 重新计算今日整体正确率
+        const totalQuestions = dailyProgress[todayProgressIndex].questionsAnswered
+        const totalSessions = dailyProgress[todayProgressIndex].sessions
+        const avgCorrectRate = Math.round(
+          (dailyProgress[todayProgressIndex].correctRate * (totalSessions - 1) + correctRate) / totalSessions
+        )
+        dailyProgress[todayProgressIndex].correctRate = avgCorrectRate
+      } else {
+        // 添加今日进度
+        dailyProgress.push({
+          date: today,
+          questionsAnswered: this.totalProblems,
+          correctRate: correctRate,
+          timeSpent: timeSpent,
+          sessions: 1
+        })
+      }
+      
+      await this.storageManager.saveDailyProgress(dailyProgress)
+      console.log('[存储] 学习进度已保存:', {
+        problems: this.totalProblems,
+        correct: this.correctAnswers,
+        time: timeSpent
+      })
+    } catch (error) {
+      console.error('[存储] 保存学习进度失败:', error)
+    }
   }
   
   // 触发庆祝动画

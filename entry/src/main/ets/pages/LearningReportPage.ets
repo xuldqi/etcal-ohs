@@ -37,23 +37,35 @@ interface DailyProgressItem {
   minutes: number
 }
 
+interface WrongQuestionStats {
+  addition: number
+  subtraction: number
+  multiplication: number
+  division: number
+  reviewed: number
+}
+
 @Component
 export struct LearningReportPage {
   onNavigate: (page: string) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
 
   @State activeTab: ReportTab = 'progress'
   @State progress: ProgressSummary = {
-    studyMinutes: 126,
-    correctRate: 92,
-    totalQuestions: 134,
-    streak: 5
+    studyMinutes: 0,
+    correctRate: 0,
+    totalQuestions: 0,
+    streak: 0
   }
-  @State wrongQuestions: WrongQuestionItem[] = [
-    { id: 'w1', question: '17 + 9 = ?', userAnswer: '24', correctAnswer: '26', type: 'addition', date: '2024-03-01' },
-    { id: 'w2', question: '45 - 19 = ?', userAnswer: '24', correctAnswer: '26', type: 'subtraction', date: '2024-03-03' },
-    { id: 'w3', question: '8 × 7 = ?', userAnswer: '48', correctAnswer: '56', type: 'multiplication', date: '2024-03-05' }
-  ]
+  @State wrongQuestions: WrongQuestionItem[] = []
   @State achievements: AchievementCard[] = []
+  @State wrongQuestionStats: WrongQuestionStats = {
+    addition: 0,
+    subtraction: 0,
+    multiplication: 0,
+    division: 0,
+    reviewed: 0
+  }
   
   // 生成成就列表
   private generateAchievements() {
@@ -98,10 +110,18 @@ export struct LearningReportPage {
     this.dailyProgress = []
   }
 
-  private audioManager: AudioManager = new AudioManager()
+  private audioManager: AudioManager = AudioManager.getInstance()
   private storageManager: StorageManager = StorageManager.getInstance()
 
+  private handleBackNavigation(): boolean {
+    this.onNavigate('home')
+    return true
+  }
+  
+  
+
   async aboutToAppear() {
+    this.registerBackHandler(() => this.handleBackNavigation())
     try {
       const abilityContext = getContext(this) as common.UIAbilityContext
       if (abilityContext) {
@@ -113,6 +133,10 @@ export struct LearningReportPage {
     await this.loadRealData()
     this.generateAchievements()
     this.audioManager.speakText('这里是你的学习报告，看看今天的表现吧')
+  }
+
+  aboutToDisappear() {
+    this.registerBackHandler(null)
   }
   
   // 加载真实学习数据
@@ -160,12 +184,40 @@ export struct LearningReportPage {
       // 如果没有数据，显示空状态而不是模拟数据
       this.dailyProgress = []
     }
+    
+    // 加载错题统计
+    const allWrongQuestions = await this.storageManager.loadWrongQuestions()
+    this.wrongQuestionStats = {
+      addition: allWrongQuestions.filter((q) => q.type === 'addition').length,
+      subtraction: allWrongQuestions.filter((q) => q.type === 'subtraction').length,
+      multiplication: allWrongQuestions.filter((q) => q.type === 'multiplication').length,
+      division: allWrongQuestions.filter((q) => q.type === 'division').length,
+      reviewed: allWrongQuestions.filter((q) => q.mastered).length
+    }
   }
 
   private setTab(tab: ReportTab) {
     this.activeTab = tab
     // 播放切换提示音而不是随机数字
     this.audioManager.speakText('切换到' + this.getTabLabel(tab))
+  }
+  
+  // 开始错题重练
+  private async startWrongQuestionReview(item: WrongQuestionItem) {
+    try {
+      this.audioManager.speakText(`开始重练：${item.question}`)
+      // 跳转到练习页面并开启对应类型的练习
+      const modeMap = new Map<string, string>()
+      modeMap.set('addition', 'practice')
+      modeMap.set('subtraction', 'practice')
+      modeMap.set('multiplication', 'practice')
+      modeMap.set('division', 'practice')
+      const targetMode = modeMap.get(item.type) || 'practice'
+      this.onNavigate(targetMode)
+    } catch (error) {
+      console.error('跳转失败:', error)
+      this.audioManager.speakText('跳转失败，请稍后重试')
+    }
   }
 
   private getTabLabel(tab: ReportTab): string {
@@ -176,6 +228,29 @@ export struct LearningReportPage {
       case 'calendar': return '日历'
       default: return '报告'
     }
+  }
+
+  private calculateBarHeight(questions: number): number {
+    return Math.max(8, Math.min(30, questions * 2))
+  }
+
+  private calculateBarHeightFromMinutes(minutes: number): number {
+    return Math.max(8, Math.min(30, minutes * 3))
+  }
+
+  private getAvgCorrectRate(): number {
+    if (this.dailyProgress.length === 0) {
+      return 0
+    }
+    return Math.round(this.dailyProgress.reduce((sum, item) => sum + item.correctRate, 0) / this.dailyProgress.length)
+  }
+
+  private getTotalMinutes(): number {
+    return this.dailyProgress.reduce((sum, item) => sum + item.minutes, 0)
+  }
+
+  private getTotalQuestions(): number {
+    return this.dailyProgress.reduce((sum, item) => sum + item.questions, 0)
   }
 
   @Builder
@@ -237,31 +312,80 @@ export struct LearningReportPage {
       .borderRadius(20)
       .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
 
-      // 本周学习趋势
+      // 本周学习趋势 - 每日答题数量
       Column({ space: 8 }) {
-        Text('本周学习趋势')
+        Text('每日答题数量')
           .fontSize(14)
           .fontWeight(FontWeight.Bold)
           .fontColor('#374151')
 
-        Row({ space: 6 }) {
-          ForEach([1, 2, 3, 4, 5, 6, 7], (day: number) => {
-            Column({ space: 4 }) {
-              Text(day.toString())
-                .fontSize(11)
-                .fontColor('#6b7280')
-              
-              Column()
-                .width(16)
-                .height(Math.random() * 30 + 15)
-                .backgroundColor('#3b82f6')
-                .borderRadius(3)
-            }
-            .alignItems(HorizontalAlign.Center)
-          })
+        if (this.dailyProgress.length > 0) {
+          Row({ space: 6 }) {
+            ForEach(this.dailyProgress, (item: DailyProgressItem, index: number) => {
+              Column({ space: 4 }) {
+                Text(item.date.substring(3))
+                  .fontSize(11)
+                  .fontColor('#6b7280')
+                
+                Column()
+                  .width(16)
+                  .height(this.calculateBarHeight(item.questions))
+                  .backgroundColor('#3b82f6')
+                  .borderRadius(3)
+              }
+              .alignItems(HorizontalAlign.Center)
+            })
+          }
+          .justifyContent(FlexAlign.SpaceEvenly)
+          .width('100%')
+        } else {
+          Text('暂无学习数据')
+            .fontSize(13)
+            .fontColor('#9ca3af')
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .padding({ top: 20, bottom: 20 })
         }
-        .justifyContent(FlexAlign.SpaceEvenly)
-        .width('100%')
+      }
+      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor(Color.White)
+      .borderRadius(20)
+      .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
+      
+      // 每日学习时长分布
+      Column({ space: 8 }) {
+        Text('每日学习时长分布')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#374151')
+
+        if (this.dailyProgress.length > 0) {
+          Row({ space: 6 }) {
+            ForEach(this.dailyProgress, (item: DailyProgressItem, index: number) => {
+              Column({ space: 4 }) {
+                Text(item.date.substring(3))
+                  .fontSize(11)
+                  .fontColor('#6b7280')
+                
+                Column()
+                  .width(16)
+                  .height(this.calculateBarHeightFromMinutes(item.minutes))
+                  .backgroundColor('#22c55e')
+                  .borderRadius(3)
+              }
+              .alignItems(HorizontalAlign.Center)
+            })
+          }
+          .justifyContent(FlexAlign.SpaceEvenly)
+          .width('100%')
+        } else {
+          Text('暂无学习数据')
+            .fontSize(13)
+            .fontColor('#9ca3af')
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .padding({ top: 20, bottom: 20 })
+        }
       }
       .padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor(Color.White)
@@ -295,7 +419,16 @@ export struct LearningReportPage {
       // 错题统计
       Row({ space: 12 }) {
         this.MetricCard('错题总数', `${this.wrongQuestions.length} 道`, '#ef4444')
-        this.MetricCard('已复习', '2 道', '#22c55e')
+        this.MetricCard('已复习', `${this.wrongQuestionStats.reviewed} 道`, '#22c55e')
+      }
+      .width('100%')
+      
+      // 错题类型统计
+      Row({ space: 8 }) {
+        this.MetricCard('加法', `${this.wrongQuestionStats.addition}`, '#f59e0b')
+        this.MetricCard('减法', `${this.wrongQuestionStats.subtraction}`, '#10b981')
+        this.MetricCard('乘法', `${this.wrongQuestionStats.multiplication}`, '#a855f7')
+        this.MetricCard('除法', `${this.wrongQuestionStats.division}`, '#ef4444')
       }
       .width('100%')
 
@@ -340,15 +473,26 @@ export struct LearningReportPage {
                   .fontColor('#1f2937')
                   .layoutWeight(1)
                 
-                Button('复习')
-                  .fontSize(12)
-                  .fontColor('#3b82f6')
-                  .backgroundColor('#dbeafe')
-                  .borderRadius(12)
-                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                  .onClick(() => {
-                    this.audioManager.speakText(`复习题目：${item.question}`)
-                  })
+                Row({ space: 8 }) {
+                  Button('复习')
+                    .fontSize(12)
+                    .fontColor('#3b82f6')
+                    .backgroundColor('#dbeafe')
+                    .borderRadius(12)
+                    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                    .onClick(() => {
+                      this.audioManager.speakText(`复习题目：${item.question}`)
+                    })
+                  Button('重练')
+                    .fontSize(12)
+                    .fontColor('#22c55e')
+                    .backgroundColor('#dcfce7')
+                    .borderRadius(12)
+                    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                    .onClick(async () => {
+                      await this.startWrongQuestionReview(item)
+                    })
+                }
               }
               .width('100%')
 
@@ -494,8 +638,14 @@ export struct LearningReportPage {
     Column({ space: 8 }) {
       // 本周学习统计
       Row({ space: 12 }) {
-        this.MetricCard('本周学习', `${this.dailyProgress.reduce((sum, item) => sum + item.minutes, 0)} 分钟`, '#3b82f6')
-        this.MetricCard('本周题目', `${this.dailyProgress.reduce((sum, item) => sum + item.questions, 0)} 道`, '#22c55e')
+        this.MetricCard('学习天数', `${this.dailyProgress.length} 天`, '#3b82f6')
+        this.MetricCard('答题总数', `${this.getTotalQuestions()} 道`, '#22c55e')
+      }
+      .width('100%')
+      
+      Row({ space: 12 }) {
+        this.MetricCard('平均正确率', `${this.getAvgCorrectRate()}%`, '#f59e0b')
+        this.MetricCard('学习时长', `${this.getTotalMinutes()} 分钟`, '#a855f7')
       }
       .width('100%')
 
@@ -586,7 +736,8 @@ export struct LearningReportPage {
       // 统一标题栏
       UnifiedHeader({
         title: '学习报告',
-        onBack: () => { this.onNavigate('home') }
+        onBack: () => { this.handleBackNavigation() },
+        
       })
 
       // 标签按钮

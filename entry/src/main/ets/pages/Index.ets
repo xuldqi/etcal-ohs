@@ -1,3 +1,4 @@
+
 import { router } from '@kit.ArkUI';
 import { display } from '@kit.ArkUI';
 import { VoiceCalculatorPage } from './VoiceCalculatorPage';
@@ -55,6 +56,7 @@ struct Index {
   @State showPolicyPage: string = ''
   @State selectedSettingsContentId: string = '' // 设置页面要打开的内容ID
   @State returnToPrivacyDialog: boolean = false // 返回时是否显示隐私弹窗
+  private backHandler: (() => boolean) | null = null
   private privacyChecked: boolean = false // 'privacy' | 'agreement' | ''
   @State learningStats: LearningStats = {
     totalProblems: 0,
@@ -281,7 +283,33 @@ struct Index {
 
   // 页面导航方法
   navigateToPage(page: string): void {
+    this.backHandler = null
     this.currentPage = page
+  }
+
+  // 注册系统返回处理
+  private registerBackHandler(handler: (() => boolean) | null): void {
+    this.backHandler = handler
+  }
+
+  // 统一处理系统返回键
+  onBackPress(): boolean {
+    if (this.backHandler) {
+      try {
+        const handled = this.backHandler()
+        if (handled) {
+          return true
+        }
+      } catch (error) {
+        console.error('[首页] 返回处理异常:', error)
+      }
+    }
+
+    if (this.currentPage !== 'home') {
+      this.navigateToPage('home')
+      return true
+    }
+    return false
   }
 
   // 设置当前语音
@@ -312,35 +340,42 @@ struct Index {
         VoiceCalculatorPage({ 
           onNavigate: (page: string) => this.navigateToPage(page),
           appState: this.learningStats,
-          setAppState: (state: object) => this.updateLearningStats(state as LearningStats)
+          setAppState: (state: object) => this.updateLearningStats(state as LearningStats),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       } else if (this.currentPage === 'practice') {
         PracticePage({ 
           onNavigate: (page: string) => this.navigateToPage(page),
           learningStats: this.learningStats,
-          updateStats: (stats: LearningStats) => this.updateLearningStats(stats)
+          updateStats: (stats: LearningStats) => this.updateLearningStats(stats),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       } else if (this.currentPage === 'adventure') {
         AdventurePage({ 
-          onNavigate: (page: string) => this.navigateToPage(page)
+          onNavigate: (page: string) => this.navigateToPage(page),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       } else if (this.currentPage === 'visual') {
         VisualLearningPage({ 
-          onNavigate: (page: string) => this.navigateToPage(page)
+          onNavigate: (page: string) => this.navigateToPage(page),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       } else if (this.currentPage === 'report') {
         LearningReportPage({ 
-          onNavigate: (page: string) => this.navigateToPage(page)
+          onNavigate: (page: string) => this.navigateToPage(page),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       } else if (this.currentPage === 'voice') {
         VoiceSettingsPage({ 
-          onNavigate: (page: string) => this.navigateToPage(page)
+          onNavigate: (page: string) => this.navigateToPage(page),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       } else if (this.currentPage === 'settings') {
         AppSettingsPage({ 
           onNavigate: (page: string) => this.navigateToPage(page),
           openContentId: this.selectedSettingsContentId,
           fromPrivacyDialog: this.returnToPrivacyDialog, // 传递是否来自隐私弹窗
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler),
           onOpened: () => {
             // AppSettingsPage已打开后重置标志
             if (this.selectedSettingsContentId) {
@@ -366,7 +401,8 @@ struct Index {
         })
       } else if (this.currentPage === 'report-issue') {
         ReportIssuePage({ 
-          onNavigate: (page: string) => this.navigateToPage(page)
+          onNavigate: (page: string) => this.navigateToPage(page),
+          registerBackHandler: (handler: (() => boolean) | null) => this.registerBackHandler(handler)
         })
       }
 

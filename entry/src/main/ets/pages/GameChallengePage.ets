@@ -48,7 +48,7 @@ export struct GameChallengePage {
   @State characterMessage: string = ''
   @State showCharacterMessage: boolean = false
 
-  private audioManager: AudioManager = new AudioManager()
+  private audioManager: AudioManager = AudioManager.getInstance()
   private timer: number = -1
 
   aboutToAppear() {

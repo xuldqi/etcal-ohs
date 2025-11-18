@@ -1,0 +1,21 @@
+{
+  "HVIGOR": {
+    "IS_INCREMENTAL": true,
+    "IS_DAEMON": true,
+    "IS_PARALLEL": true,
+    "IS_HVIGORFILE_TYPE_CHECK": false,
+    "TASK_TIME": {},
+    "APIS": [
+      "getHvigorConfig",
+      "getRootNodeDescriptor",
+      "getChildNode",
+      "getNodeByName",
+      "getAllNodes",
+      "getRootNode",
+      "getNodeName"
+    ],
+    "CONFIG_PROPERTIES": {},
+    "BUILD_ID": "202510191958378520",
+    "TOTAL_TIME": 2883829097
+  }
+}

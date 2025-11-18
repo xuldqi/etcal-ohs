@@ -15,6 +15,7 @@ interface VoiceSettings {
 
 // 音频管理器 - 处理语音播报功能
 export class AudioManager {
+  private static instance: AudioManager | null = null
   private isEnabled: boolean = true
   private speechRate: number = 0.8
   private speechPitch: number = 1.1
@@ -27,10 +28,21 @@ export class AudioManager {
   private availableVoices: string[] = ['小美老师', '小明同学', '小华老师', '标准语音']
   private voiceSettings: Map<string, VoiceConfig> = new Map()
 
-  constructor() {
+  private constructor() {
     void this.ensurePlayer()
     this.initializeAudioCache()
     this.initializeVoiceSettings()
+  }
+
+  static getInstance(): AudioManager {
+    if (!AudioManager.instance) {
+      AudioManager.instance = new AudioManager()
+    }
+    return AudioManager.instance
+  }
+
+  static hasInstance(): boolean {
+    return AudioManager.instance !== null
   }
 
   private async ensurePlayer(): Promise<media.AVPlayer | null> {
@@ -147,6 +159,12 @@ export class AudioManager {
   // 启用/禁用语音
   setEnabled(enabled: boolean) {
     this.isEnabled = enabled
+    console.log(`[音频] 语音播报${enabled ? '已启用' : '已禁用'}`)
+  }
+  
+  // 获取语音状态
+  getEnabled(): boolean {
+    return this.isEnabled
   }
 
   // 语音播报文本
@@ -156,13 +174,8 @@ export class AudioManager {
     }
 
     try {
-      // 优先使用预录制的音频文件
-      if (this.audioCache.has(text)) {
-        this.playAudioFile(text)
-      } else {
-        // 降级到TTS播报
+      // 直接使用TTS播报，避免AVPlayer状态问题
         this.speakWithTTS(text)
-      }
     } catch (error) {
       console.error('语音播报失败:', error)
       // 降级到控制台输出

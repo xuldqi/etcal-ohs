@@ -224,3 +224,9 @@ hdc shell hilog | grep -E "录音|试听"
 
 
 
+
+
+
+
+
+

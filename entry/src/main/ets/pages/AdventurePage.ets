@@ -27,6 +27,7 @@ interface AchievementItem {
 @Component
 export struct AdventurePage {
   onNavigate: (page: string) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
 
   @State gameView: GameView = 'levelSelect'
   @State levels: LevelCard[] = [
@@ -58,10 +59,24 @@ export struct AdventurePage {
   @State showCharacterMessage: boolean = true
   @State highlightAchievement: AchievementItem | null = null
 
-  private audioManager: AudioManager = new AudioManager()
+  private audioManager: AudioManager = AudioManager.getInstance()
+
+  private handleBackNavigation(): boolean {
+    if (this.gameView === 'achievements') {
+      this.gameView = 'levelSelect'
+    } else {
+      this.onNavigate('home')
+    }
+    return true
+  }
 
   aboutToAppear() {
+    this.registerBackHandler(() => this.handleBackNavigation())
     this.audioManager.speakText('欢迎来到数学大冒险，选择一个关卡开始吧')
+  }
+
+  aboutToDisappear() {
+    this.registerBackHandler(null)
   }
 
   private cloneLevel(level: LevelCard): LevelCard {
@@ -457,13 +472,7 @@ export struct AdventurePage {
                   .backgroundColor('rgba(255,255,255,0.2)')
                   .borderRadius(20)
                   .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-                  .onClick(() => { 
-                    if (this.gameView === 'achievements') {
-                      this.gameView = 'levelSelect'
-                    } else {
-                      this.onNavigate('home')
-                    }
-                  })
+                  .onClick(() => { this.handleBackNavigation() })
 
                   Blank()
 

@@ -4,6 +4,8 @@ import media from '@ohos.multimedia.media'
 import common from '@ohos.app.ability.common'
 import abilityAccessCtrl from '@ohos.abilityAccessCtrl'
 import fs from '@ohos.file.fs'
+import preferences from '@ohos.data.preferences'
+import { audio } from '@kit.AudioKit'
 
 interface AudioItem {
   id: string
@@ -44,9 +46,33 @@ interface RecordingFileInfo {
   path: string
 }
 
+// 持久化数据结构
+interface PersistedMapEntry {
+  schemeId: string
+  items: string[]
+}
+
+interface PersistedPathItem {
+  itemId: string
+  path: string
+}
+
+interface PersistedPathEntry {
+  schemeId: string
+  paths: PersistedPathItem[]
+}
+
+interface PersistedData {
+  version: number
+  recordedMap: PersistedMapEntry[]
+  recordedAudioPaths: PersistedPathEntry[]
+  voiceSchemes?: VoiceScheme[]
+}
+
 @Component
 export struct VoiceSettingsPage {
   onNavigate: (page: string) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
 
   @State currentView: 'list' | 'recording' = 'list'
   @State selectedScheme: VoiceScheme | null = null
@@ -87,6 +113,15 @@ export struct VoiceSettingsPage {
     }
   ]
 
+  private handleBackNavigation(): boolean {
+    if (this.currentView === 'recording') {
+      this.backToList()
+    } else {
+      this.onNavigate('home')
+    }
+    return true
+  }
+
   private audioItems: AudioItem[] = [
     { id: '0', label: '数字 0', key: '0', audioPath: 'rawfile/audio/num0.ogg' },
     { id: '1', label: '数字 1', key: '1', audioPath: 'rawfile/audio/num1.ogg' },
@@ -113,8 +148,7 @@ export struct VoiceSettingsPage {
     { id: 'delete', label: '删除', key: 'delete' }
   ]
 
-  private audioManager: AudioManager = new AudioManager()
-  private avPlayer: media.AVPlayer | null = null
+  private audioManager: AudioManager = AudioManager.getInstance()
   private statusResetTimer: number | null = null
   private audioRecorder: media.AVRecorder | null = null
   private abilityContext: common.UIAbilityContext | null = null
@@ -128,13 +162,23 @@ export struct VoiceSettingsPage {
   private currentRecordingFilePath: string = ''
   private currentRecordingLabel: string = ''
   private hasAudioPermission: boolean = false
+  private currentPlayer: media.AVPlayer | null = null
+  private currentPlayerFd: number | null = null
+  @State showDeleteDialog: boolean = false
+  @State schemeToDelete: VoiceScheme | null = null
 
   aboutToAppear() {
-    this.audioManager.speakText('选择喜欢的语音方案')
+    this.registerBackHandler(() => this.handleBackNavigation())
     this.ensureAbilityContext()
-    void this.initAVPlayer()
     void this.initAudioRecorder()
     void this.checkAudioPermissions()
+    void this.loadPersistentData()
+    // 从AudioManager获取当前语音状态
+    this.isAudioEnabled = this.audioManager.getEnabled()
+    // 只在语音开启时播报
+    if (this.isAudioEnabled) {
+      this.audioManager.speakText('选择喜欢的语音方案')
+    }
   }
 
   private ensureAbilityContext(): common.UIAbilityContext | null {
@@ -216,22 +260,11 @@ export struct VoiceSettingsPage {
   }
 
   async aboutToDisappear() {
+    this.registerBackHandler(null)
     this.clearRecordingTimer()
     if (this.statusResetTimer !== null) {
       clearTimeout(this.statusResetTimer)
       this.statusResetTimer = null
-    }
-    if (this.avPlayer) {
-      try {
-        await this.avPlayer.stop()
-      } catch (_) {}
-      try {
-        this.avPlayer.reset()
-      } catch (_) {}
-      try {
-        this.avPlayer.release?.()
-      } catch (_) {}
-      this.avPlayer = null
     }
     if (this.audioRecorder) {
       try {
@@ -244,20 +277,6 @@ export struct VoiceSettingsPage {
     }
   }
 
-  async initAVPlayer() {
-    try {
-      this.avPlayer = await media.createAVPlayer()
-      console.log('AVPlayer初始化成功')
-      
-      // 绑定播放器事件
-      this.bindPlayerEvents()
-      
-      this.setStatus('播放器已准备就绪')
-    } catch (error) {
-      console.error('AVPlayer初始化失败:', error)
-      this.setStatus('当前环境暂不支持音频播放', false)
-    }
-  }
 
   async initAudioRecorder() {
     try {
@@ -307,169 +326,196 @@ export struct VoiceSettingsPage {
     }
   }
 
-  private bindPlayerEvents() {
-    if (!this.avPlayer) return
-    
-    try {
-      this.avPlayer.on?.('error', (err: Error) => {
-        console.error('[音频播放] 播放错误:', JSON.stringify(err))
-        this.setStatus('音频播放失败，请检查音频文件', true, 3000)
-      })
-      
-      this.avPlayer.on?.('stateChange', (state: string) => {
-        console.debug(`[音频播放] 播放状态: ${state}`)
-        if (state === 'completed') {
-          this.playingItemId = ''
-          this.setStatus('播放完成')
-        }
-      })
-      
-      this.avPlayer.on?.('stateChange', (state: string) => {
-        if (state === 'completed') {
-          console.log('[音频播放] 播放完成')
-          this.playingItemId = ''
-          this.setStatus('播放完成')
-        }
-      })
-    } catch (error) {
-      console.warn('注册音频播放器事件失败:', error)
-    }
-  }
 
-  private async ensureAVPlayer(): Promise<media.AVPlayer | null> {
-    if (this.avPlayer) {
-      return this.avPlayer
-    }
-    await this.initAVPlayer()
-    return this.avPlayer
-  }
-
-  private async stopPlayer(player: media.AVPlayer) {
-    try {
-      // 强制停止播放器
-      await player.stop()
-      console.info('[音频] 播放器已停止')
-    } catch (error) {
-      console.warn('[音频] 停止播放器失败:', error)
-    }
-    
-    try {
-      // 重置播放器到初始状态
-      player.reset()
-      console.info('[音频] 播放器已重置')
-    } catch (error) {
-      console.warn('[音频] 重置播放器失败:', error)
-    }
-  }
 
   private async playRawResource(resourcePath: string, item: AudioItem) {
-    const context = this.ensureAbilityContext()
-    if (!context) {
-      console.error('[试听] ❌ 缺少UIAbilityContext，无法访问资源')
-      this.setStatus('❌ 无法访问音频资源', true, 3000)
-      return
-    }
-
-    // 创建独立的播放器实例，不依赖类成员
-    let player: media.AVPlayer | null = null
-    const resourceManager = context.resourceManager
-    let fileDescriptor: FileDescriptor | null = null
-
     try {
+      // 先停止当前播放
+      await this.stopCurrentPlayer()
+
       this.playingItemId = item.id
       this.setStatus(`🔊 正在试听「${item.label}」`, false)
 
-      // 创建新的播放器实例
-      player = await media.createAVPlayer()
-      console.info('[音频] 独立播放器已创建')
-
-      // 等待播放器完全初始化
-      await new Promise<void>(resolve => setTimeout(resolve, 50))
-      
-      // 强制reset到initialized状态
-      console.info(`[音频] reset前状态: ${player.state}`)
-      player.reset()
-      console.info(`[音频] reset后状态: ${player.state}`)
-
-      const rawFileDescriptor = await resourceManager.getRawFileDescriptor(resourcePath)
-      console.info(`[音频] 文件描述符获取成功: fd=${rawFileDescriptor.fd}, offset=${rawFileDescriptor.offset}, length=${rawFileDescriptor.length}`)
-      
-      fileDescriptor = {
-        fd: rawFileDescriptor.fd,
-        offset: rawFileDescriptor.offset,
-        length: rawFileDescriptor.length
+      const context = this.ensureAbilityContext()
+      if (!context) {
+        throw new Error('无法获取应用上下文')
       }
 
+      // 创建新的AVPlayer
+      const player = await media.createAVPlayer()
+      this.currentPlayer = player
+
+      // 设置状态机回调
+      player.on('stateChange', async (state: string) => {
+        switch (state) {
+          case 'initialized':
+            console.info('[音频] 播放器已初始化')
+            // 设置音频输出属性
+            player.audioRendererInfo = {
+              usage: audio.StreamUsage.STREAM_USAGE_MUSIC,
+              rendererFlags: 0,
+            }
+            // 触发prepare
+            player.prepare()
+            break
+          case 'prepared':
+            console.info('[音频] 播放器已准备就绪')
+            // 自动播放
+            player.play()
+            break
+          case 'playing':
+            console.info('[音频] 开始播放')
+            this.setStatus(`🎵 正在播放「${item.label}」`, false)
+            break
+          case 'completed':
+            console.info('[音频] 播放完成')
+            this.playingItemId = ''
+            this.setStatus('播放完成', true, 1500)
+            this.stopCurrentPlayer()
+            break
+          case 'error':
+            console.error('[音频] 播放器错误')
+            this.playingItemId = ''
+            this.setStatus('❌ 播放失败', true, 3000)
+            this.stopCurrentPlayer()
+            break
+        }
+      })
+
+      // 获取文件描述符
+      const resourceManager = context.resourceManager
+      const fileDescriptor = await resourceManager.getRawFileDescriptor(resourcePath)
+      console.info(`[音频] 获取文件描述符成功: fd=${fileDescriptor.fd}, offset=${fileDescriptor.offset}, length=${fileDescriptor.length}`)
+
+      // 设置fdSrc
       player.fdSrc = {
         fd: fileDescriptor.fd,
         offset: fileDescriptor.offset,
-        length: fileDescriptor.length
+        length: fileDescriptor.length,
       }
-      console.info('[音频] fdSrc设置完成')
+      this.currentPlayerFd = fileDescriptor.fd
 
-      console.info(`[音频] 准备播放，当前状态: ${player.state}`)
-      
-      await player.prepare()
-      console.info(`[音频] prepare完成，当前状态: ${player.state}`)
-      
-      await player.play()
-      console.info(`[音频] play完成，当前状态: ${player.state}`)
+      // 设置url会触发initialized状态
+      player.url = `fd://${fileDescriptor.fd}`
 
-      console.info(`[试听] ✓ 播放系统音频成功: ${item.label} (${resourcePath})`)
     } catch (error) {
-      console.error(`[试听] ❌ 播放系统音频失败: ${item.label}`, error)
+      console.error(`[试听] ❌ 播放失败: ${item.label}`, error)
       this.playingItemId = ''
-      this.setStatus('❌ 播放失败，请检查音频文件或权限', true, 5000)
-      this.audioManager.speakText('播放失败，请检查音频文件')
-    } finally {
-      // 清理资源
-      if (fileDescriptor) {
-        try {
-          resourceManager.closeRawFileDescriptor(fileDescriptor.fd.toString())
-        } catch (error) {
-          console.warn('[试听] 关闭文件描述符失败:', error)
-        }
-      }
-      if (player) {
-        try {
-          await player.release()
-          console.info('[音频] 独立播放器已释放')
-        } catch (error) {
-          console.warn('[音频] 释放独立播放器失败:', error)
-        }
-      }
+      this.setStatus('❌ 播放失败，请检查音频文件', true, 3000)
+      this.stopCurrentPlayer()
+    }
+  }
+
+  private getTTSForItem(item: AudioItem): string {
+    // 根据音频项目返回对应的TTS文本
+    switch (item.key) {
+      case '0': return '零'
+      case '1': return '一'
+      case '2': return '二'
+      case '3': return '三'
+      case '4': return '四'
+      case '5': return '五'
+      case '6': return '六'
+      case '7': return '七'
+      case '8': return '八'
+      case '9': return '九'
+      case '+': return '加'
+      case '-': return '减'
+      case '×': return '乘'
+      case '÷': return '除'
+      case '=': return '等于'
+      case '.': return '点'
+      case '个': return '个'
+      case '十': return '十'
+      case '百': return '百'
+      case '千': return '千'
+      case '万': return '万'
+      case 'clear': return '清空'
+      case 'delete': return '删除'
+      default: return item.label
     }
   }
 
   private async playFile(path: string, item: AudioItem) {
-    const player = await this.ensureAVPlayer()
-    if (!player) {
-      console.error('[试听] ❌ 音频播放器未初始化')
-      this.setStatus('❌ 音频播放器未准备好，请稍后重试', true, 3000)
-      return
-    }
-
     try {
+      // 先停止当前播放
+      await this.stopCurrentPlayer()
+
       this.playingItemId = item.id
       this.setStatus(`🎵 正在试听「${item.label}」`, false)
 
-      await this.stopPlayer(player)
-      
-      // 等待播放器状态重置完成
-      await new Promise<void>(resolve => setTimeout(resolve, 100))
-      
-      // 使用file://格式的URI播放本地文件
-      const fileUri = `file://${path}`
-      player.url = fileUri
-      await player.prepare()
-      await player.play()
+      // 创建新的AVPlayer
+      const player = await media.createAVPlayer()
+      this.currentPlayer = player
 
-      console.info(`[试听] ✓ 播放自定义音频成功: ${item.label} (${fileUri})`)
+      // 打开文件获取fd
+      const file = await fs.open(path)
+      console.info(`[音频] 打开文件成功: fd=${file.fd}`)
+      this.currentPlayerFd = file.fd
+
+      // 设置状态机回调
+      player.on('stateChange', async (state: string) => {
+        switch (state) {
+          case 'initialized':
+            console.info('[音频] 播放器已初始化')
+            // 设置音频输出属性
+            player.audioRendererInfo = {
+              usage: audio.StreamUsage.STREAM_USAGE_MUSIC,
+              rendererFlags: 0,
+            }
+            // 触发prepare
+            player.prepare()
+            break
+          case 'prepared':
+            console.info('[音频] 播放器已准备就绪')
+            // 自动播放
+            player.play()
+            break
+          case 'playing':
+            console.info('[音频] 开始播放')
+            this.setStatus(`🎵 正在播放「${item.label}」`, false)
+            break
+          case 'completed':
+            console.info('[音频] 播放完成')
+            this.playingItemId = ''
+            this.setStatus('播放完成', true, 1500)
+            this.stopCurrentPlayer()
+            break
+          case 'error':
+            console.error('[音频] 播放器错误')
+            this.playingItemId = ''
+            this.setStatus('❌ 播放失败', true, 3000)
+            this.stopCurrentPlayer()
+            break
+        }
+      })
+
+      // 设置url会触发initialized状态
+      player.url = `fd://${file.fd}`
+
     } catch (error) {
-      console.error(`[试听] ❌ 播放自定义音频失败: ${item.label}`, error)
+      console.error(`[试听] ❌ 播放失败: ${item.label}`, error)
       this.playingItemId = ''
-      this.setStatus('❌ 播放失败，请检查录音文件', true, 5000)
-      this.audioManager.speakText('播放失败，请检查录音文件')
+      this.setStatus('❌ 播放失败，请检查录音文件', true, 3000)
+      this.stopCurrentPlayer()
+    }
+  }
+
+  private async stopCurrentPlayer() {
+    try {
+      if (this.currentPlayer) {
+        if (this.currentPlayer.state === 'playing' || this.currentPlayer.state === 'paused') {
+          this.currentPlayer.stop()
+        }
+        this.currentPlayer.release()
+        this.currentPlayer = null
+      }
+      if (this.currentPlayerFd !== null) {
+        fs.closeSync(this.currentPlayerFd)
+        this.currentPlayerFd = null
+      }
+    } catch (error) {
+      console.error('[音频] 停止播放器失败:', error)
     }
   }
 
@@ -522,6 +568,125 @@ export struct VoiceSettingsPage {
     schemePaths.set(itemId, filePath)
 
     this.updateSchemeRecordedCount(schemeId, updated.length)
+    void this.savePersistentData()
+  }
+
+  // 持久化：保存/加载录音记录
+  private async getPrefs(): Promise<preferences.Preferences | null> {
+    try {
+      const ctx = this.ensureAbilityContext()
+      if (!ctx) return null
+      const pref = await preferences.getPreferences(ctx, 'voice_prefs')
+      return pref
+    } catch (e) {
+      console.error('[持久化] 获取Preferences失败:', e)
+      return null
+    }
+  }
+
+  private async savePersistentData() {
+    try {
+      const pref = await this.getPrefs()
+      if (!pref) return
+      const mapArr: PersistedMapEntry[] = []
+      this.recordedMap.forEach((arr, sid) => { mapArr.push({ schemeId: sid, items: arr.slice() }) })
+
+      const pathArr: PersistedPathEntry[] = []
+      this.recordedAudioPaths.forEach((inner, sid) => {
+        const list: PersistedPathItem[] = []
+        inner.forEach((p, itemId) => { list.push({ itemId: itemId, path: p }) })
+        pathArr.push({ schemeId: sid, paths: list })
+      })
+
+      const payload: PersistedData = {
+        version: 1,
+        recordedMap: mapArr,
+        recordedAudioPaths: pathArr,
+        voiceSchemes: this.voiceSchemes.slice()
+      }
+      await pref.put('recordedData', JSON.stringify(payload))
+      await pref.flush()
+      console.info('[持久化] 录音记录和语音方案已保存')
+    } catch (e) {
+      console.error('[持久化] 保存失败:', e)
+    }
+  }
+
+  private async loadPersistentData() {
+    try {
+      const pref = await this.getPrefs()
+      if (!pref) return
+      const raw = (await pref.get('recordedData', '')) as string
+      if (!raw) return
+      const data = JSON.parse(raw) as PersistedData
+
+      const newRecordedMap: Map<string, string[]> = new Map()
+      ;(data.recordedMap || []).forEach((entry) => {
+        if (entry && entry.schemeId && Array.isArray(entry.items)) {
+          newRecordedMap.set(entry.schemeId, entry.items)
+        }
+      })
+      this.recordedMap = newRecordedMap
+
+      const newPaths: Map<string, Map<string, string>> = new Map()
+      ;(data.recordedAudioPaths || []).forEach((entry) => {
+        if (entry && entry.schemeId && Array.isArray(entry.paths)) {
+          const innerMap = new Map<string, string>()
+          entry.paths.forEach(p => { if (p && p.itemId && p.path) innerMap.set(p.itemId, p.path) })
+          newPaths.set(entry.schemeId, innerMap)
+        }
+      })
+      this.recordedAudioPaths = newPaths
+
+      // 恢复语音方案列表
+      if (data.voiceSchemes && Array.isArray(data.voiceSchemes)) {
+        this.voiceSchemes = data.voiceSchemes
+        console.info('[持久化] 语音方案已恢复')
+      }
+
+      // 恢复每个方案的计数
+      this.voiceSchemes.forEach((scheme) => {
+        const count = this.recordedMap.get(scheme.id)?.length || 0
+        this.updateSchemeRecordedCount(scheme.id, count)
+      })
+      console.info('[持久化] 录音记录已恢复')
+    } catch (e) {
+      console.error('[持久化] 加载失败:', e)
+    }
+  }
+
+  private deleteScheme(schemeId: string) {
+    try {
+      // 删除录音文件
+      const schemePaths = this.recordedAudioPaths.get(schemeId)
+      if (schemePaths) {
+        schemePaths.forEach((filePath) => {
+          try {
+            if (fs.accessSync(filePath)) {
+              fs.unlinkSync(filePath)
+              console.info(`[删除] 已删除录音文件: ${filePath}`)
+            }
+          } catch (error) {
+            console.warn(`[删除] 删除文件失败: ${filePath}`, error)
+          }
+        })
+      }
+
+      // 从内存中清理数据
+      this.recordedMap.delete(schemeId)
+      this.recordedAudioPaths.delete(schemeId)
+
+      // 从方案列表中删除
+      this.voiceSchemes = this.voiceSchemes.filter(scheme => scheme.id !== schemeId)
+
+      // 保存到持久化存储
+      void this.savePersistentData()
+
+      console.info(`[删除] 方案已删除: ${schemeId}`)
+    } catch (error) {
+      console.error('[删除] 删除方案失败:', error)
+      this.setStatus('删除失败，请重试', true, 3000)
+    }
   }
 
   private updateSchemeRecordedCount(schemeId: string, recordedCount: number) {
@@ -656,6 +821,10 @@ export struct VoiceSettingsPage {
 
     this.showCreateDialog = false
     this.newSchemeName = ''
+    
+    // 保存到持久化存储
+    void this.savePersistentData()
+    
     this.enterRecordingView(newScheme)
   }
 
@@ -915,27 +1084,33 @@ export struct VoiceSettingsPage {
 
           if (scheme.id !== 'system') {
             Row({ space: 8 }) {
-              Row()
-                .width(200)
-                .height(8)
-                .backgroundColor('#e5e7eb')
-                .borderRadius(4)
-                .clip(true)
+              Stack() {
+                // 背景条
+                Row()
+                  .width(200)
+                  .height(8)
+                  .backgroundColor('#e5e7eb')
+                  .borderRadius(4)
 
-              Row()
-                .width(`${(scheme.recordedCount / scheme.totalCount) * 100}%`)
-                .height(8)
-                .backgroundColor(scheme.recordedCount === scheme.totalCount ? '#22c55e' : '#3b82f6')
-                .borderRadius(4)
-                .position({ x: 0, y: 0 })
+                // 进度条
+                Row()
+                  .width(`${Math.max(4, (scheme.recordedCount / scheme.totalCount) * 200)}`)
+                  .height(8)
+                  .backgroundColor(scheme.recordedCount === scheme.totalCount ? '#22c55e' : '#3b82f6')
+                  .borderRadius(4)
+                  .position({ x: 0, y: 0 })
+              }
+              .alignContent(Alignment.TopStart)
+              .width(200)
+              .height(8)
 
               Text(`${scheme.recordedCount}/${scheme.totalCount} 已录制`)
                 .fontSize(12)
                 .fontColor(scheme.recordedCount === scheme.totalCount ? '#16a34a' : '#2563eb')
                 .fontWeight(FontWeight.Medium)
-                .margin({ left: -192 })
             }
             .width('100%')
+            .alignItems(VerticalAlign.Top)
             .padding({ left: 0, right: 0, top: 8, bottom: 0 })
           }
 
@@ -1081,67 +1256,38 @@ export struct VoiceSettingsPage {
     Column({ space: 16 }) {
       // 标题已在UnifiedHeader中显示，这里不再重复显示
 
-      if (this.selectedScheme) {
-        Column({ space: 12 }) {
-          Text('录音提示')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#1f2937')
-
-          Text('点击下方按钮开始录制，保持发音清晰，保持愉快的语调。')
-            .fontSize(14)
-            .fontColor('#6b7280')
-            .lineHeight(20)
-
-          Text(`已完成 ${this.selectedScheme.recordedCount}/${this.selectedScheme.totalCount}`)
-            .fontSize(14)
+      if (this.selectedScheme && this.selectedScheme.id === 'system') {
+        // 系统默认方案：仅提供“试听”，不显示任何录音相关提示/按钮
+        if (this.statusMessage) {
+          Text(this.statusMessage)
+            .fontSize(12)
             .fontColor('#2563eb')
-            .fontWeight(FontWeight.Medium)
+            .backgroundColor('#e0f2fe')
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+            .borderRadius(12)
         }
-        .width('100%')
-        .padding({ left: 20, right: 20, top: 16, bottom: 16 })
-        .backgroundColor('#eff6ff')
-        .borderRadius(20)
-      }
 
-      if (this.statusMessage && this.statusMessage !== '录制完成') {
-        Text(this.statusMessage)
-          .fontSize(12)
-          .fontColor('#2563eb')
-          .backgroundColor('#e0f2fe')
-          .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-          .borderRadius(12)
-      }
-
-      Column({ space: 12 }) {
-        ForEach(this.audioItems, (item: AudioItem) => {
-          Row({ space: 16 }) {
-            Column({ space: 4 }) {
-              Row({ space: 8 }) {
-                Text(item.label)
-                  .fontSize(14)
-                  .fontColor('#1f2937')
-                  .textAlign(TextAlign.Start)
-                
-                if (this.isItemRecorded(item.id)) {
-                  Text('✓ 已录制')
-                    .fontSize(12)
-                    .fontColor('#10b981')
-                    .fontWeight(FontWeight.Bold)
+        Column({ space: 12 }) {
+          ForEach(this.audioItems, (item: AudioItem) => {
+            Row({ space: 16 }) {
+              Column({ space: 4 }) {
+                Row({ space: 8 }) {
+                  Text(item.label)
+                    .fontSize(14)
+                    .fontColor('#1f2937')
+                    .textAlign(TextAlign.Start)
                 }
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Start)
-              
-              Text(item.key)
-                .fontSize(12)
-                .fontColor('#6b7280')
-                .textAlign(TextAlign.Start)
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
+                .width('100%')
+                .justifyContent(FlexAlign.Start)
 
-            Row({ space: 8 }) {
+                Text(item.key)
+                  .fontSize(12)
+                  .fontColor('#6b7280')
+                  .textAlign(TextAlign.Start)
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+
               Button(this.playingItemId === item.id ? '播放中' : '试听')
                 .fontSize(12)
                 .fontColor(Color.White)
@@ -1149,35 +1295,114 @@ export struct VoiceSettingsPage {
                 .borderRadius(10)
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                 .onClick(() => this.playAudio(item))
-
-              Button(this.getRecordingButtonText(item.id))
-                .fontSize(12)
-                .fontColor(Color.White)
-                .backgroundColor(this.getRecordingButtonColor(item.id))
-                .borderRadius(10)
-                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .enabled(!this.isRecording || this.recordingItemId === item.id)
-                .onClick(() => this.startRecording(item.id))
             }
+            .width('100%')
+            .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+            .backgroundColor(Color.White)
+            .borderRadius(16)
+            .shadow({ radius: 6, color: '#00000008', offsetX: 0, offsetY: 4 })
+          })
+        }
+        .width('100%')
+      } else {
+        // 非系统方案：保留录音相关提示与按钮
+        if (this.selectedScheme) {
+          Column({ space: 12 }) {
+            Text('录音提示')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#1f2937')
+
+            Text('点击下方按钮开始录制，保持发音清晰，保持愉快的语调。')
+              .fontSize(14)
+              .fontColor('#6b7280')
+              .lineHeight(20)
+
           }
           .width('100%')
-          .padding({ left: 20, right: 20, top: 12, bottom: 12 })
-          .backgroundColor(Color.White)
-          .borderRadius(16)
-          .shadow({ radius: 6, color: '#00000008', offsetX: 0, offsetY: 4 })
-        })
+          .padding({ left: 20, right: 20, top: 16, bottom: 16 })
+          .backgroundColor('#eff6ff')
+          .borderRadius(20)
+        }
+
+        if (this.statusMessage && this.statusMessage !== '录制完成') {
+          Text(this.statusMessage)
+            .fontSize(12)
+            .fontColor('#2563eb')
+            .backgroundColor('#e0f2fe')
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+            .borderRadius(12)
+        }
+
+        Column({ space: 12 }) {
+          ForEach(this.audioItems, (item: AudioItem) => {
+            Row({ space: 16 }) {
+              Column({ space: 4 }) {
+                Row({ space: 8 }) {
+                  Text(item.label)
+                    .fontSize(14)
+                    .fontColor('#1f2937')
+                    .textAlign(TextAlign.Start)
+                  
+                  if (this.isItemRecorded(item.id)) {
+                    Text('✓ 已录制')
+                      .fontSize(12)
+                      .fontColor('#10b981')
+                      .fontWeight(FontWeight.Bold)
+                  }
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.Start)
+                
+                Text(item.key)
+                  .fontSize(12)
+                  .fontColor('#6b7280')
+                  .textAlign(TextAlign.Start)
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+
+              Row({ space: 8 }) {
+                Button(this.playingItemId === item.id ? '播放中' : '试听')
+                  .fontSize(12)
+                  .fontColor(Color.White)
+                  .backgroundColor('#3b82f6')
+                  .borderRadius(10)
+                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                  .onClick(() => this.playAudio(item))
+
+                Button(this.getRecordingButtonText(item.id))
+                  .fontSize(12)
+                  .fontColor(Color.White)
+                  .backgroundColor(this.getRecordingButtonColor(item.id))
+                  .borderRadius(10)
+                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                  .enabled(!this.isRecording || this.recordingItemId === item.id)
+                  .onClick(() => this.startRecording(item.id))
+              }
+            }
+            .width('100%')
+            .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+            .backgroundColor(Color.White)
+            .borderRadius(16)
+            .shadow({ radius: 6, color: '#00000008', offsetX: 0, offsetY: 4 })
+          })
+        }
+        .width('100%')
       }
-      .width('100%')
     }
     .width('100%')
     .padding({ left: 16, right: 16, bottom: 24 })
   }
 
   build() {
-    Column() {
+    Column({ space: 16 }) {
+      // 统一标题栏
       UnifiedHeader({
-        title: this.currentView === 'recording' ? `录制 - ${this.selectedScheme?.name || '语音方案'}` : '语音设置',
-        onBack: () => this.currentView === 'recording' ? this.backToList() : this.onNavigate('home')
+        title: this.currentView === 'recording'
+          ? (this.selectedScheme?.id === 'system' ? '系统默认' : `${this.selectedScheme?.name || '语音方案'}`)
+          : '语音选择',
+        onBack: () => { this.handleBackNavigation() },
       })
 
       if (this.currentView === 'list') {
@@ -1187,7 +1412,24 @@ export struct VoiceSettingsPage {
         .layoutWeight(1)
       } else if (this.currentView === 'recording') {
         Scroll() {
-          this.RecordingView()
+          Column() {
+            this.RecordingView()
+            
+            // 删除按钮放在滚动内容的最底部
+            if (this.selectedScheme && this.selectedScheme.id !== 'system') {
+              Button('删除方案')
+                .fontSize(16)
+                .fontColor('#dc2626')
+                .backgroundColor('#fef2f2')
+                .borderRadius(12)
+                .padding({ left: 24, right: 24, top: 12, bottom: 12 })
+                .margin({ left: 16, right: 16, top: 24, bottom: 24 })
+                .onClick(() => {
+                  this.schemeToDelete = this.selectedScheme
+                  this.showDeleteDialog = true
+                })
+            }
+          }
         }
         .layoutWeight(1)
       }
@@ -1245,6 +1487,67 @@ export struct VoiceSettingsPage {
         .onClick(() => {
           this.showCreateDialog = false
           this.newSchemeName = ''
+        })
+      }
+
+      if (this.showDeleteDialog && this.schemeToDelete) {
+        // 全屏半透明遮罩，透出下层界面
+        Column() {
+          Column({ space: 16 }) {
+            Text('确认删除')
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#1f2937')
+
+            Text(`确定要删除语音方案"${this.schemeToDelete.name}"吗？\n删除后将无法恢复所有录音文件。`)
+              .fontSize(14)
+              .fontColor('#6b7280')
+              .textAlign(TextAlign.Center)
+
+            Row({ space: 12 }) {
+              Button('取消')
+                .fontSize(14)
+                .fontColor('#6b7280')
+                .backgroundColor(Color.White)
+                .borderRadius(12)
+                .layoutWeight(1)
+                .onClick(() => {
+                  this.showDeleteDialog = false
+                  this.schemeToDelete = null
+                })
+
+              Button('删除')
+                .fontSize(14)
+                .fontColor(Color.White)
+                .backgroundColor('#dc2626')
+                .borderRadius(12)
+                .layoutWeight(1)
+                .onClick(() => {
+                  if (this.schemeToDelete) {
+                    this.deleteScheme(this.schemeToDelete.id)
+                    this.showDeleteDialog = false
+                    this.schemeToDelete = null
+                    // 删除后回到列表页面
+                    this.currentView = 'list'
+                    this.selectedScheme = null
+                  }
+                })
+            }
+          }
+          .width(320)
+          .padding({ left: 24, right: 24, top: 24, bottom: 24 })
+          .backgroundColor(Color.White)
+          .borderRadius(20)
+          .shadow({ radius: 20, color: '#00000030', offsetX: 0, offsetY: 10 })
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(0,0,0,0.5)')
+        .justifyContent(FlexAlign.Center)
+        .position({ x: 0, y: 0 })
+        .onClick(() => {
+          this.showDeleteDialog = false
+          this.schemeToDelete = null
         })
       }
     }

@@ -23,6 +23,7 @@ export struct VoiceCalculatorPage {
   onNavigate: (page: string) => void = () => {}
   @Prop appState: object
   setAppState: (state: object) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
 
   @State display: string = '0'
   @State expression: string = ''
@@ -44,7 +45,7 @@ export struct VoiceCalculatorPage {
   @State dialogCancelText: string = '取消'
   @State dialogHasCancel: boolean = false
 
-  private audioManager: AudioManager = new AudioManager()
+  private audioManager: AudioManager = AudioManager.getInstance()
   private voiceManager: VoiceManager = new VoiceManager()
   private storageManager: StorageManager = StorageManager.getInstance()
   private pendingTimers: number[] = []
@@ -53,10 +54,12 @@ export struct VoiceCalculatorPage {
   private abilityContext: common.UIAbilityContext | null = null
 
   aboutToAppear() {
+    this.registerBackHandler(() => this.handleBackNavigation())
     this.initializeManagers()
   }
 
   aboutToDisappear() {
+    this.registerBackHandler(null)
     this.cleanup()
     this.voiceManager.stopListening()
   }
@@ -99,6 +102,11 @@ export struct VoiceCalculatorPage {
   private cleanup(): void {
     this.clearPendingTimers()
     this.audioManager.stopSpeaking()
+  }
+
+  private handleBackNavigation(): boolean {
+    this.onNavigate('home')
+    return true
   }
 
   private showInlineDialog(options: DialogOptions): void {
@@ -766,7 +774,7 @@ export struct VoiceCalculatorPage {
         // 统一标题栏
         UnifiedHeader({
           title: '语音计算器',
-          onBack: () => { this.onNavigate('home') },
+          onBack: () => { this.handleBackNavigation() },
           rightButtonText: '历史记录',
           rightButtonColor: '#2C7A4B',
           rightButtonBgColor: '#EEF8F2',
@@ -847,21 +855,9 @@ export struct VoiceCalculatorPage {
         })
         .margin({ top: 8, bottom: 8 })
 
-        // 历史记录按钮已移至右上角
+        // 语音输入按钮 - 已移除
         // Row({ space: 14 }) {
-        //   // 语音输入按钮已隐藏
-        //   // this.UtilityButton(
-        //   //   this.isListening ? '正在聆听...' : '语音输入',
-        //   //   this.isListening ? '#FFE8EA' : '#EEF1FF',
-        //   //   () => { this.toggleVoiceRecognition() },
-        //   //   this.isListening ? '#E53935' : '#3455D1'
-        //   // )
-        //   this.UtilityButton(
-        //     '历史记录',
-        //     '#EEF8F2',
-        //     () => this.showHistory(),
-        //     '#2C7A4B'
-        //   )
+        //   this.VoiceInputButton()
         // }
         // .width('90%')
         // .margin({ top: 12 })
@@ -869,7 +865,7 @@ export struct VoiceCalculatorPage {
         Column({ space: 12 }) {
           Row({ space: 12 }) {
             this.CalculatorButton('C', '#FDEBEC', () => this.clear(), '#E86464')
-            this.CalculatorButton('±', '#FDEBEC', () => this.toggleSign(), '#E86464')
+            this.CalculatorButton('←', '#FDEBEC', () => this.backspace(), '#E86464')
             this.CalculatorButton('%', '#FDEBEC', () => this.applyPercent(), '#E86464')
             this.CalculatorButton('÷', '#FFECD6', () => this.inputOperator('÷'), '#DA8A00')
           }
@@ -1010,5 +1006,39 @@ export struct VoiceCalculatorPage {
     .backgroundColor(backgroundColor)
     .shadow({ radius: 8, color: '#14000000', offsetX: 0, offsetY: 4 })
     .onClick(() => { onClick() })
+  }
+  
+  @Builder
+  VoiceInputButton() {
+    Button() {
+      Row({ space: 8 }) {
+        Text('🎤')
+          .fontSize(20)
+        Text(this.isListening ? '正在聆听...' : '按住说话')
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.isListening ? '#E53935' : '#3455D1')
+      }
+    }
+    .height(50)
+    .layoutWeight(1)
+    .borderRadius(16)
+    .backgroundColor(this.isListening ? '#FFE8EA' : '#EEF1FF')
+    .shadow({ radius: 8, color: '#14000000', offsetX: 0, offsetY: 4 })
+    .onTouch((event) => {
+      if (event.type === TouchType.Down) {
+        // 按下时开始语音识别
+        if (!this.isListening) {
+          void this.toggleVoiceRecognition()
+        }
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        // 释放时停止语音识别
+        if (this.isListening) {
+          this.voiceManager.stopListening()
+          this.isListening = false
+          this.voiceStatus = '点击语音按钮开始语音计算'
+        }
+      }
+    })
   }
 }

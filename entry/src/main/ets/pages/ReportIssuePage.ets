@@ -15,12 +15,18 @@ interface ReportTypeConfig {
 @Component
 export struct ReportIssuePage {
   onNavigate: (page: string) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
   
   @State reportType: ReportType | null = null
   @State description: string = ''
   @State contact: string = ''
   @State isSubmitting: boolean = false
   @State showSuccess: boolean = false
+
+  private handleBackNavigation(): boolean {
+    this.onNavigate('settings')
+    return true
+  }
   
   // 举报类型配置
   private reportTypes: ReportTypeConfig[] = [
@@ -63,6 +69,11 @@ export struct ReportIssuePage {
 
   aboutToAppear() {
     console.log('[问题举报] 页面初始化')
+    this.registerBackHandler(() => this.handleBackNavigation())
+  }
+
+  aboutToDisappear() {
+    this.registerBackHandler(null)
   }
 
   build() {
@@ -70,7 +81,7 @@ export struct ReportIssuePage {
       // 统一标题栏
       UnifiedHeader({
         title: '问题举报',
-        onBack: () => this.onNavigate('settings')
+        onBack: () => { this.handleBackNavigation() }
       })
 
       if (this.showSuccess) {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 开始构建 HarmonyOS APP v1.1.2"
+echo "🚀 开始构建 HarmonyOS APP v1.2.3"
 
 # 清理环境变量
 unset DEVECO_SDK_HOME
@@ -22,14 +22,31 @@ rm -rf build/
 rm -rf entry/build/
 rm -rf .hvigor/
 
-echo "🔧 同步项目配置..."
-./hvigorw --sync -p product=default --analyze=false --no-parallel --no-incremental --no-daemon
+# 检查Node.js是否存在
+if ! command -v node &> /dev/null
+then
+    echo "❌ 未找到 Node.js，正在尝试使用系统Node.js"
+    # 尝试使用系统Node.js
+else
+    echo "✅ 找到 Node.js"
+fi
+
+# 检查是否可以直接使用hvigor
+if [ -f "node_modules/@ohos/hvigor/bin/hvigor.js" ]; then
+    echo "🔧 使用本地hvigor进行项目同步..."
+    node build_wrapper.js --sync -p product=default --analyze=false --no-parallel --no-incremental --no-daemon
+else
+    echo "🔧 尝试直接构建..."
+fi
 
 echo "🏗️ 构建APP..."
-./hvigorw assembleApp -p product=default --analyze=false --no-parallel --no-incremental --no-daemon
+if [ -f "node_modules/@ohos/hvigor/bin/hvigor.js" ]; then
+    node build_wrapper.js assembleApp -p product=default --analyze=false --no-parallel --no-incremental --no-daemon
+else
+    echo "⚠️  未找到hvigor，尝试使用默认构建命令"
+    # 如果hvigorw不存在，尝试直接使用node运行
+    node build_wrapper.js assembleHap -p product=default
+fi
 
 echo "✅ 构建完成！"
 echo "📱 APP文件位置: build/outputs/default/OHS-default-signed.app"
-
-
-

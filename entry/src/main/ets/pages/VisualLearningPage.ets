@@ -29,6 +29,7 @@ interface VisualStats {
 @Component
 export struct VisualLearningPage {
   onNavigate: (page: string) => void = () => {}
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
 
   @State currentQuestion: VisualQuestion | null = null
   @State options: number[] = []
@@ -38,7 +39,7 @@ export struct VisualLearningPage {
   @State stats: VisualStats = { correct: 0, total: 0, stars: 0 }
   @State showCelebration: boolean = false
 
-  private audioManager: AudioManager = new AudioManager()
+  private audioManager: AudioManager = AudioManager.getInstance()
   private nextQuestionTimer?: number
   private questionTemplates: VisualTemplate[] = [
     { object: '小猫', emoji: '🐱', quantifier: '只' },
@@ -52,10 +53,12 @@ export struct VisualLearningPage {
   ]
 
   aboutToAppear() {
+    this.registerBackHandler(() => this.handleBackNavigation())
     this.prepareQuestion()
   }
 
   aboutToDisappear() {
+    this.registerBackHandler(null)
     this.clearNextQuestionTimer()
   }
 
@@ -64,6 +67,11 @@ export struct VisualLearningPage {
       clearTimeout(this.nextQuestionTimer)
       this.nextQuestionTimer = undefined
     }
+  }
+
+  private handleBackNavigation(): boolean {
+    this.onNavigate('home')
+    return true
   }
 
   private scheduleNextQuestion(delayMs: number, beforeNext?: () => void) {
@@ -310,7 +318,7 @@ export struct VisualLearningPage {
       // 统一标题栏
       UnifiedHeader({
         title: '学数学',
-        onBack: () => { this.onNavigate('home') }
+        onBack: () => { this.handleBackNavigation() }
       })
 
       Column({ space: 12 }) {

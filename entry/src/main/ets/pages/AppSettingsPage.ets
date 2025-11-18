@@ -1,4 +1,7 @@
 import { UnifiedHeader } from '../components/UnifiedHeader'
+import { AudioManager } from '../managers/AudioManager'
+import { StorageManager } from '../managers/StorageManager'
+import common from '@ohos.app.ability.common'
 
 interface SettingsSection {
   title: string
@@ -27,13 +30,64 @@ export struct AppSettingsPage {
   openContentId: string = ''
   onOpened?: () => void = undefined
   onBackToHome?: () => void = undefined
+  registerBackHandler: (handler: (() => boolean) | null) => void = () => {}
   @Prop fromPrivacyDialog: boolean = false
 
   @State selectedItem: SettingsItem | null = null
   @State pageTitle: string = '设置'
   private openedDirectly: boolean = false
+  @State voiceEnabled: boolean = true
+  private audioManager: AudioManager = AudioManager.getInstance()
+  private storageManager: StorageManager = StorageManager.getInstance()
+  private abilityContext: common.UIAbilityContext | null = null
 
-  aboutToAppear() {
+  private handleBackNavigation(): boolean {
+    if (this.selectedItem) {
+      if (this.openedDirectly && this.fromPrivacyDialog) {
+        this.openedDirectly = false
+        if (this.onBackToHome) {
+          this.onBackToHome()
+        } else {
+          this.onNavigate('home')
+        }
+      } else {
+        this.selectedItem = null
+        this.pageTitle = '设置'
+        this.openedDirectly = false
+      }
+      return true
+    }
+
+    if (this.onBackToHome) {
+      this.onBackToHome()
+    } else {
+      this.onNavigate('home')
+    }
+    return true
+  }
+
+  async aboutToAppear() {
+    this.registerBackHandler(() => this.handleBackNavigation())
+    // 初始化存储并恢复语音开关
+    try {
+      this.abilityContext = getContext(this) as common.UIAbilityContext
+      if (this.abilityContext) {
+        await this.storageManager.init(this.abilityContext)
+      }
+      const stored = await this.storageManager.getItem('voice_enabled')
+      if (stored !== null) {
+        const enabled = JSON.parse(stored) as boolean
+        this.voiceEnabled = enabled
+        this.audioManager.setEnabled(enabled)
+      } else {
+        // 若无存储，使用当前音频管理器状态并写入
+        this.voiceEnabled = this.audioManager.getEnabled()
+        await this.storageManager.setItem('voice_enabled', JSON.stringify(this.voiceEnabled))
+      }
+    } catch (error) {
+      // 存储失败不影响页面显示
+      this.voiceEnabled = this.audioManager.getEnabled()
+    }
     if (this.openContentId) {
       const targetItem = this.items.find(item => item.id === this.openContentId)
       if (targetItem) {
@@ -50,6 +104,10 @@ export struct AppSettingsPage {
         this.onOpened?.()
       }, 0)
     }
+  }
+
+  aboutToDisappear() {
+    this.registerBackHandler(null)
   }
 
   private items: SettingsItem[] = [
@@ -347,18 +405,7 @@ export struct AppSettingsPage {
           .backgroundColor('#6b7280')
           .borderRadius(12)
           .padding({ left: 24, right: 24, top: 10, bottom: 10 })
-          .onClick(() => {
-            if (this.openedDirectly && this.fromPrivacyDialog) {
-              this.openedDirectly = false
-              if (this.onBackToHome) {
-                this.onBackToHome()
-              }
-            } else {
-              this.selectedItem = null
-              this.pageTitle = '设置'
-              this.openedDirectly = false
-            }
-          })
+          .onClick(() => { this.handleBackNavigation() })
       }
       .width('100%')
       .margin({ top: 8 })
@@ -375,26 +422,7 @@ export struct AppSettingsPage {
         // 统一标题栏
         UnifiedHeader({
           title: this.pageTitle,
-          onBack: () => {
-            if (this.selectedItem) {
-              if (this.openedDirectly && this.fromPrivacyDialog) {
-                this.openedDirectly = false
-                if (this.onBackToHome) {
-                  this.onBackToHome()
-                }
-              } else {
-                this.selectedItem = null
-                this.pageTitle = '设置'
-                this.openedDirectly = false
-              }
-            } else {
-              if (this.onBackToHome) {
-                this.onBackToHome()
-              } else {
-                this.onNavigate('home')
-              }
-            }
-          }
+          onBack: () => { this.handleBackNavigation() }
         })
 
       Scroll() {
@@ -407,6 +435,42 @@ export struct AppSettingsPage {
               .textAlign(TextAlign.Center)
               .width('100%')
               .margin({ top: 8, bottom: 8 })
+
+            // 语音播报开关卡片
+            Row({ space: 12 }) {
+              Column({ space: 4 }) {
+                Text('语音播报')
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#1f2937')
+                Text(this.voiceEnabled ? '声音已开启' : '声音已关闭')
+                  .fontSize(12)
+                  .fontColor('#6b7280')
+              }
+              .layoutWeight(1)
+
+              Button(this.voiceEnabled ? '关闭' : '开启')
+                .fontSize(14)
+                .fontColor(this.voiceEnabled ? '#ef4444' : Color.White)
+                .backgroundColor(this.voiceEnabled ? '#fee2e2' : '#22c55e')
+                .borderRadius(16)
+                .padding({ left: 18, right: 18, top: 10, bottom: 10 })
+                .onClick(async () => {
+                  this.voiceEnabled = !this.voiceEnabled
+                  this.audioManager.setEnabled(this.voiceEnabled)
+                  try {
+                    await this.storageManager.setItem('voice_enabled', JSON.stringify(this.voiceEnabled))
+                  } catch (_) {}
+                  if (this.voiceEnabled) {
+                    this.audioManager.speakText('声音已开启')
+                  }
+                })
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+            .backgroundColor(Color.White)
+            .borderRadius(16)
+            .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
           }
 
           // 内容区域
@@ -438,7 +502,7 @@ export struct AppSettingsPage {
               .borderRadius(20)
               .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
 
-              Text('儿童语音计算器 v1.1.1 | 让学习更有趣')
+              Text('儿童语音计算器 v1.2.3 | 让学习更有趣')
                 .fontSize(12)
                 .fontColor('#9ca3af')
             }
@@ -457,7 +521,7 @@ export struct AppSettingsPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 20, right: 20, top: 0, bottom: 24 })
+    .padding({ left: 20, right: 20, top: 16, bottom: 24 })
     .linearGradient({
       direction: GradientDirection.Bottom,
       colors: [['#bae6fd', 0.0], ['#dbeafe', 0.5], ['#e9d5ff', 1.0]]
