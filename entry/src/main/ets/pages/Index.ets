@@ -587,7 +587,6 @@ struct Index {
   // 可爱圆点装饰
   @Builder
   DotPattern(): void {
-    // 创建简单的圆点装饰
     Stack() {
       // 第一排圆点
       Row() {
@@ -618,6 +617,28 @@ struct Index {
       .width('100%')
       .justifyContent(FlexAlign.SpaceAround)
       .position({ y: 380 })
+      
+      // 添加浮动装饰元素
+      Text('🎈')
+        .fontSize(30)
+        .position({ x: 30, y: 100 })
+      
+      Text('🎨')
+        .fontSize(30)
+        .position({ x: this.screenWidth - 60, y: 140 })
+      
+      Text('🌈')
+        .fontSize(25)
+        .position({ x: 20, y: this.screenHeight / 2 })
+      
+      // 底部星星装饰
+      Text('⭐')
+        .fontSize(35)
+        .position({ x: 20, y: this.screenHeight - 100 })
+      
+      Text('🌟')
+        .fontSize(35)
+        .position({ x: this.screenWidth - 60, y: this.screenHeight - 100 })
     }
     .width('100%')
     .height('100%')

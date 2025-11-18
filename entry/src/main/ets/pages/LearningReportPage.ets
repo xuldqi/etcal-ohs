@@ -252,6 +252,30 @@ export struct LearningReportPage {
   private getTotalQuestions(): number {
     return this.dailyProgress.reduce((sum, item) => sum + item.questions, 0)
   }
+  
+  // 获取趋势指示器
+  private getTrendIndicator(): string {
+    const avgRate = this.getAvgCorrectRate()
+    if (avgRate > 80) return '📈 进步中'
+    if (avgRate > 60) return '📊 稳定'
+    return '📉 需加油'
+  }
+  
+  // 获取趋势颜色
+  private getTrendColor(): string {
+    const avgRate = this.getAvgCorrectRate()
+    if (avgRate > 80) return '#16a34a'
+    if (avgRate > 60) return '#ca8a04'
+    return '#dc2626'
+  }
+  
+  // 获取趋势背景色
+  private getTrendBgColor(): string {
+    const avgRate = this.getAvgCorrectRate()
+    if (avgRate > 80) return '#dcfce7'
+    if (avgRate > 60) return '#fef3c7'
+    return '#fee2e2'
+  }
 
   @Builder
   TabButton(tab: ReportTab, label: string) {
@@ -306,6 +330,38 @@ export struct LearningReportPage {
           .fontSize(13)
           .fontColor('#4b5563')
           .lineHeight(18)
+      }
+      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor(Color.White)
+      .borderRadius(20)
+      .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
+      
+      // 学习趋势指示器
+      Column({ space: 8 }) {
+        Row() {
+          Text('学习趋势')
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#374151')
+          
+          Blank()
+          
+          // 趋势指示
+          Row({ space: 6 }) {
+            Text(this.getTrendIndicator())
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.getTrendColor())
+              .padding({ left: 12, right: 12, top: 4, bottom: 4 })
+              .backgroundColor(this.getTrendBgColor())
+              .borderRadius(12)
+          }
+        }
+        .width('100%')
+        
+        Text(`最近7天平均正确率: ${this.getAvgCorrectRate()}%`)
+          .fontSize(13)
+          .fontColor('#6b7280')
       }
       .padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor(Color.White)
