@@ -145,7 +145,7 @@ export struct VoiceSettingsPage {
     { id: 'qian', label: '千', key: '千', audioPath: 'rawfile/audio/qian.ogg' },
     { id: 'wan', label: '万', key: '万', audioPath: 'rawfile/audio/wan.ogg' },
     { id: 'clear', label: '清空', key: 'clear' }, // 没有音频文件，使用TTS
-    { id: 'delete', label: '删除', key: 'delete' } // 没有音频文件，使用TTS
+    { id: 'delete', label: '删除', key: 'delete', audioPath: 'rawfile/audio/del.ogg' }
   ]
 
   private audioManager: AudioManager = AudioManager.getInstance()
