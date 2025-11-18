@@ -73,6 +73,7 @@ export struct LearningReportPage {
   @State userInput: string = ''
   @State showResult: boolean = false
   @State isAnswerCorrect: boolean = false
+  @State selectedMistakeType: string = 'all' // 筛选的错题类型
   
   // 生成成就列表
   private generateAchievements() {
@@ -264,6 +265,14 @@ export struct LearningReportPage {
     this.userInput = ''
     this.showResult = false
     this.isAnswerCorrect = false
+  }
+  
+  // 获取筛选后的错题列表
+  private getFilteredWrongQuestions(): WrongQuestionItem[] {
+    if (this.selectedMistakeType === 'all') {
+      return this.wrongQuestions
+    }
+    return this.wrongQuestions.filter(q => q.type === this.selectedMistakeType)
   }
 
   private getTabLabel(tab: ReportTab): string {
@@ -514,6 +523,29 @@ export struct LearningReportPage {
     .border({ width: 2, color })
     .layoutWeight(1)
   }
+  
+  @Builder
+  MistakeTypeCard(label: string, value: string, color: string, type: string) {
+    Column({ space: 4 }) {
+      Text(value)
+        .fontSize(16)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.selectedMistakeType === type ? Color.White : '#1f2937')
+      Text(label)
+        .fontSize(10)
+        .fontColor(this.selectedMistakeType === type ? Color.White : '#6b7280')
+    }
+    .padding({ left: 6, right: 6, top: 12, bottom: 12 })
+    .backgroundColor(this.selectedMistakeType === type ? color : Color.White)
+    .borderRadius(12)
+    .shadow({ radius: 6, color: '#00000008', offsetX: 0, offsetY: 4 })
+    .border({ width: this.selectedMistakeType === type ? 0 : 2, color: this.selectedMistakeType === type ? color : '#e5e7eb' })
+    .layoutWeight(1)
+    .onClick(() => {
+      this.selectedMistakeType = type
+      this.audioManager.speakText(`筛选${label}错题`)
+    })
+  }
 
   @Builder
   MistakeTab() {
@@ -531,12 +563,13 @@ export struct LearningReportPage {
       }
       .width('100%')
       
-      // 错题类型统计
+      // 错题类型统计（可点击筛选）
       Row({ space: 8 }) {
-        this.MetricCard('加法', `${this.wrongQuestionStats.addition}`, '#f59e0b')
-        this.MetricCard('减法', `${this.wrongQuestionStats.subtraction}`, '#10b981')
-        this.MetricCard('乘法', `${this.wrongQuestionStats.multiplication}`, '#a855f7')
-        this.MetricCard('除法', `${this.wrongQuestionStats.division}`, '#ef4444')
+        this.MistakeTypeCard('全部', `${this.wrongQuestions.length}`, '#6b7280', 'all')
+        this.MistakeTypeCard('加法', `${this.wrongQuestionStats.addition}`, '#f59e0b', 'addition')
+        this.MistakeTypeCard('减法', `${this.wrongQuestionStats.subtraction}`, '#10b981', 'subtraction')
+        this.MistakeTypeCard('乘法', `${this.wrongQuestionStats.multiplication}`, '#a855f7', 'multiplication')
+        this.MistakeTypeCard('除法', `${this.wrongQuestionStats.division}`, '#ef4444', 'division')
       }
       .width('100%')
 
@@ -549,7 +582,7 @@ export struct LearningReportPage {
           .textAlign(TextAlign.Center)
           .width('100%')
 
-        if (this.wrongQuestions.length === 0) {
+        if (this.getFilteredWrongQuestions().length === 0) {
           Column({ space: 8 }) {
             Text('🎉')
               .fontSize(40)
@@ -572,7 +605,7 @@ export struct LearningReportPage {
           .borderRadius(20)
           .shadow({ radius: 8, color: '#00000010', offsetX: 0, offsetY: 4 })
         } else {
-          ForEach(this.wrongQuestions, (item: WrongQuestionItem) => {
+          ForEach(this.getFilteredWrongQuestions(), (item: WrongQuestionItem) => {
             Column({ space: 12 }) {
               Row({ space: 8 }) {
                 Text(item.question)
