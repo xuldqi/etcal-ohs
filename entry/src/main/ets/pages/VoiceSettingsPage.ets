@@ -843,8 +843,16 @@ export struct VoiceSettingsPage {
       if (item.audioPath) {
         await this.playRawResource(item.audioPath, item)
       } else {
-        console.warn('[试听] ❌ 系统方案缺少音频资源', item)
-        this.setStatus('❌ 未找到对应的系统音频', true, 3000)
+        // 对于没有音频文件的项，使用TTS播报
+        console.warn(`[试听] 系统方案缺少音频资源: ${item.label}，使用TTS播报`)
+        this.playingItemId = item.id
+        this.setStatus(`🔊 正在试听「${item.label}」`, false)
+        const ttsText = this.getTTSForItem(item)
+        this.audioManager.speakText(ttsText)
+        setTimeout(() => {
+          this.playingItemId = ''
+          this.setStatus('播放完成', true, 1500)
+        }, 1500)
       }
       console.info(`[试听] ===== 试听流程完成 =====`)
       return
