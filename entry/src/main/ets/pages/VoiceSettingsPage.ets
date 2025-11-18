@@ -139,7 +139,6 @@ export struct VoiceSettingsPage {
     { id: 'divide', label: '除号 ÷', key: '÷', audioPath: 'rawfile/audio/division.ogg' },
     { id: 'equals', label: '等号 =', key: '=', audioPath: 'rawfile/audio/dengyu.ogg' },
     { id: 'decimal', label: '小数点 .', key: '.', audioPath: 'rawfile/audio/dian.ogg' },
-    { id: 'ge', label: '个', key: '个' }, // 没有音频文件，使用TTS
     { id: 'shi', label: '十', key: '十', audioPath: 'rawfile/audio/shi.ogg' },
     { id: 'bai', label: '百', key: '百', audioPath: 'rawfile/audio/bai.ogg' },
     { id: 'qian', label: '千', key: '千', audioPath: 'rawfile/audio/qian.ogg' },
@@ -425,7 +424,6 @@ export struct VoiceSettingsPage {
       case '÷': return '除'
       case '=': return '等于'
       case '.': return '点'
-      case '个': return '个'
       case '十': return '十'
       case '百': return '百'
       case '千': return '千'
