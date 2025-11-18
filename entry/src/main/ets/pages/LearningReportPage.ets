@@ -67,6 +67,13 @@ export struct LearningReportPage {
     reviewed: 0
   }
   
+  // 错题重练模式状态
+  @State practiceMode: boolean = false
+  @State currentQuestionIndex: number = 0
+  @State userInput: string = ''
+  @State showResult: boolean = false
+  @State isAnswerCorrect: boolean = false
+  
   // 生成成就列表
   private generateAchievements() {
     const totalQuestions = this.progress.totalQuestions
@@ -205,19 +212,58 @@ export struct LearningReportPage {
   // 开始错题重练
   private async startWrongQuestionReview(item: WrongQuestionItem) {
     try {
-      this.audioManager.speakText(`开始重练：${item.question}`)
-      // 跳转到练习页面并开启对应类型的练习
-      const modeMap = new Map<string, string>()
-      modeMap.set('addition', 'practice')
-      modeMap.set('subtraction', 'practice')
-      modeMap.set('multiplication', 'practice')
-      modeMap.set('division', 'practice')
-      const targetMode = modeMap.get(item.type) || 'practice'
-      this.onNavigate(targetMode)
+      // 找到错题在列表中的索引
+      const index = this.wrongQuestions.findIndex(q => q.id === item.id)
+      if (index >= 0) {
+        this.currentQuestionIndex = index
+        this.practiceMode = true
+        this.userInput = ''
+        this.showResult = false
+        this.isAnswerCorrect = false
+        this.audioManager.speakText(`开始重练：${item.question}`)
+      }
     } catch (error) {
-      console.error('跳转失败:', error)
-      this.audioManager.speakText('跳转失败，请稍后重试')
+      console.error('启动重练失败:', error)
+      this.audioManager.speakText('启动失败，请稍后重试')
     }
+  }
+  
+  // 提交答案
+  private submitAnswer() {
+    const currentQuestion = this.wrongQuestions[this.currentQuestionIndex]
+    const correct = this.userInput.trim() === currentQuestion.correctAnswer.trim()
+    this.isAnswerCorrect = correct
+    this.showResult = true
+    
+    if (correct) {
+      this.audioManager.speakText('答对了，太棒了')
+    } else {
+      this.audioManager.speakText(`答错了，正确答案是${currentQuestion.correctAnswer}`)
+    }
+  }
+  
+  // 下一题
+  private nextQuestion() {
+    if (this.currentQuestionIndex < this.wrongQuestions.length - 1) {
+      this.currentQuestionIndex += 1
+      this.userInput = ''
+      this.showResult = false
+      this.isAnswerCorrect = false
+      const nextQ = this.wrongQuestions[this.currentQuestionIndex]
+      this.audioManager.speakText(`下一题：${nextQ.question}`)
+    } else {
+      this.exitPractice()
+      this.audioManager.speakText('重练完成，继续加油')
+    }
+  }
+  
+  // 退出重练
+  private exitPractice() {
+    this.practiceMode = false
+    this.currentQuestionIndex = 0
+    this.userInput = ''
+    this.showResult = false
+    this.isAnswerCorrect = false
   }
 
   private getTabLabel(tab: ReportTab): string {
@@ -471,6 +517,12 @@ export struct LearningReportPage {
 
   @Builder
   MistakeTab() {
+    // 如果处于重练模式，显示重练界面
+    if (this.practiceMode) {
+      this.PracticeModeView()
+      return
+    }
+    
     Column({ space: 12 }) {
       // 错题统计
       Row({ space: 12 }) {
@@ -590,7 +642,114 @@ export struct LearningReportPage {
       }
     }
   }
-
+  
+  @Builder
+  PracticeModeView() {
+    const currentQuestion = this.wrongQuestions[this.currentQuestionIndex]
+    
+    Column({ space: 16 }) {
+      // 头部
+      Row() {
+        Button('退出练习')
+          .fontSize(14)
+          .fontColor('#ef4444')
+          .backgroundColor('#fee2e2')
+          .borderRadius(16)
+          .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+          .onClick(() => this.exitPractice())
+        
+        Blank()
+        
+        Column({ space: 4 }) {
+          Text('错题重练')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1f2937')
+          Text(`第 ${this.currentQuestionIndex + 1} 题 / 共 ${this.wrongQuestions.length} 题`)
+            .fontSize(12)
+            .fontColor('#6b7280')
+        }
+        .alignItems(HorizontalAlign.Center)
+        
+        Blank()
+        
+        Column().width(80) // 占位元素，保持居中
+      }
+      .width('100%')
+      
+      // 题目卡片
+      Column({ space: 20 }) {
+        Text(currentQuestion.question)
+          .fontSize(48)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#1f2937')
+          .textAlign(TextAlign.Center)
+        
+        Text('=')
+          .fontSize(32)
+          .fontColor('#6b7280')
+          .textAlign(TextAlign.Center)
+        
+        // 输入框
+        TextInput({ placeholder: '?', text: this.userInput })
+          .fontSize(32)
+          .fontWeight(FontWeight.Bold)
+          .textAlign(TextAlign.Center)
+          .width(150)
+          .height(60)
+          .borderRadius(16)
+          .borderWidth(2)
+          .borderColor(this.showResult ? (this.isAnswerCorrect ? '#22c55e' : '#ef4444') : '#d1d5db')
+          .backgroundColor(Color.White)
+          .enabled(!this.showResult)
+          .onChange((value: string) => {
+            this.userInput = value
+          })
+        
+        // 按钮区
+        if (!this.showResult) {
+          Button('提交答案')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .backgroundColor(this.userInput ? '#a855f7' : '#d1d5db')
+            .borderRadius(20)
+            .padding({ left: 32, right: 32, top: 12, bottom: 12 })
+            .enabled(this.userInput.length > 0)
+            .onClick(() => this.submitAnswer())
+        } else {
+          Column({ space: 12 }) {
+            Text(this.isAnswerCorrect ? '🎉 答对了！' : '❌ 答错了')
+              .fontSize(24)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.isAnswerCorrect ? '#22c55e' : '#ef4444')
+            
+            if (!this.isAnswerCorrect) {
+              Text(`正确答案是: ${currentQuestion.correctAnswer}`)
+                .fontSize(18)
+                .fontColor('#6b7280')
+            }
+            
+            Button(this.currentQuestionIndex < this.wrongQuestions.length - 1 ? '下一题' : '完成练习')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.White)
+              .backgroundColor('#3b82f6')
+              .borderRadius(20)
+              .padding({ left: 32, right: 32, top: 12, bottom: 12 })
+              .onClick(() => this.nextQuestion())
+          }
+          .alignItems(HorizontalAlign.Center)
+        }
+      }
+      .width('100%')
+      .padding({ left: 24, right: 24, top: 40, bottom: 40 })
+      .backgroundColor(Color.White)
+      .borderRadius(24)
+      .shadow({ radius: 12, color: '#00000012', offsetX: 0, offsetY: 8 })
+    }
+  }
+  
   @Builder
   AchievementTab() {
     Column({ space: 8 }) {
