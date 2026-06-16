@@ -1,0 +1,234 @@
+import common from '@ohos.app.ability.common';
+import { AudioManager } from '../managers/AudioManager';
+
+/**
+ * 音频消息数据接口
+ */
+interface AudioMessageData {
+  number?: number;
+  operator?: string;
+  volume?: number;
+  text?: string;
+}
+
+/**
+ * 回调数据接口
+ */
+interface AudioCallbackData {
+  event: string;
+  action?: string;
+  result?: boolean | string | number | string[] | null;
+  error?: string;
+  data?: AudioMessageData;
+}
+
+/**
+ * 音频桥接类
+ * 处理Web端音频播放请求
+ */
+export default class AudioBridge {
+  private audioManager: AudioManager = AudioManager.getInstance();
+  private sendToWeb: ((data: AudioCallbackData) => void) | null = null;
+
+  /**
+   * 初始化音频桥接
+   * @param context 应用上下文
+   * @param sendCallback 向Web发送消息的回调函数
+   */
+  init(context: common.UIAbilityContext, sendCallback: (data: AudioCallbackData) => void): void {
+    this.sendToWeb = sendCallback;
+    this.audioManager.setContext(context);
+    void this.audioManager.init()
+      .then(() => {
+        console.info('AudioBridge初始化完成');
+      })
+      .catch((error: Error) => {
+        console.error('AudioBridge初始化失败', JSON.stringify(error));
+        this.sendError('audio_init', error.message);
+      });
+  }
+
+  /**
+   * 处理来自Web的音频消息
+   * @param action 操作类型
+   * @param data 数据
+   */
+  async handleMessage(action: string, data: Record<string, string | number | boolean>): Promise<void> {
+    try {
+      switch (action) {
+        case 'audio_playNumber':
+          if (data.number !== undefined && typeof data.number === 'number') {
+            await this.playNumber(data.number);
+          }
+          break;
+        case 'audio_playOperator':
+          if (data.operator !== undefined && typeof data.operator === 'string') {
+            await this.playOperator(data.operator);
+          }
+          break;
+        case 'audio_speakText':
+          if (data.text !== undefined && typeof data.text === 'string') {
+            await this.speakText(data.text);
+          }
+          break;
+        case 'audio_playDelete':
+          await this.playDelete();
+          break;
+        case 'audio_setVolume':
+          if (data.volume !== undefined && typeof data.volume === 'number') {
+            await this.setVolume(data.volume);
+          }
+          break;
+        case 'audio_preloadAudios':
+          await this.preloadAudios();
+          break;
+        default:
+          console.warn(`未知的音频操作: ${action}`);
+      }
+    } catch (error) {
+      console.error(`音频操作失败: ${action}`, JSON.stringify(error));
+      this.sendError(action, '音频操作失败');
+    }
+  }
+
+  /**
+   * 播放数字语音
+   * @param number 数字
+   */
+  private async playNumber(number: number): Promise<void> {
+    console.info(`播放数字语音: ${number}`);
+    
+    try {
+      await this.audioManager.playNumber(number);
+      const successData: AudioMessageData = { number };
+      this.sendSuccess('audio_playNumber', successData);
+    } catch (error) {
+      console.error(`播放数字语音失败: ${number}`, JSON.stringify(error));
+      throw new Error('播放数字语音失败');
+    }
+  }
+
+  /**
+   * 播放运算符语音
+   * @param operator 运算符
+   */
+  private async playOperator(operator: string): Promise<void> {
+    console.info(`播放运算符语音: ${operator}`);
+    
+    try {
+      await this.audioManager.playOperator(operator);
+      const successData: AudioMessageData = { operator };
+      this.sendSuccess('audio_playOperator', successData);
+    } catch (error) {
+      console.error(`播放运算符语音失败: ${operator}`, JSON.stringify(error));
+      throw new Error('播放运算符语音失败');
+    }
+  }
+
+  /**
+   * 原生系统语音播报文字
+   * @param text 要播报的文字
+   */
+  private async speakText(text: string): Promise<void> {
+    console.info(`使用TTS播报文字: ${text}`);
+    
+    try {
+      this.audioManager.speakText(text);
+      const successData: AudioMessageData = { text };
+      this.sendSuccess('audio_speakText', successData);
+    } catch (error) {
+      console.error(`TTS播报文字失败: ${text}`, JSON.stringify(error));
+      throw new Error('TTS播报文字失败');
+    }
+  }
+
+  /**
+   * 播放删除音效
+   */
+  private async playDelete(): Promise<void> {
+    console.info('播放删除音效');
+    
+    try {
+      await this.audioManager.playDelete();
+      const successData: AudioMessageData = {};
+      this.sendSuccess('audio_playDelete', successData);
+    } catch (error) {
+      console.error('播放删除音效失败', JSON.stringify(error));
+      throw new Error('播放删除音效失败');
+    }
+  }
+
+  /**
+   * 设置音量
+   * @param volume 音量值 (0-1)
+   */
+  private async setVolume(volume: number): Promise<void> {
+    console.info(`设置音量: ${volume}`);
+    
+    try {
+      await this.audioManager.setVolume(volume);
+      const successData: AudioMessageData = { volume };
+      this.sendSuccess('audio_setVolume', successData);
+    } catch (error) {
+      console.error(`设置音量失败: ${volume}`, JSON.stringify(error));
+      throw new Error('设置音量失败');
+    }
+  }
+
+  /**
+   * 预加载音频文件
+   */
+  private async preloadAudios(): Promise<void> {
+    console.info('预加载音频文件');
+    
+    try {
+      await this.audioManager.preloadCommonAudios();
+      const successData: AudioMessageData = {};
+      this.sendSuccess('audio_preloadAudios', successData);
+    } catch (error) {
+      console.error('预加载音频文件失败', JSON.stringify(error));
+      throw new Error('预加载音频文件失败');
+    }
+  }
+
+  /**
+   * 发送成功消息到Web
+   * @param action 操作类型
+   * @param data 数据
+   */
+  private sendSuccess(action: string, data: AudioMessageData): void {
+    if (this.sendToWeb) {
+      const successCallback: AudioCallbackData = {
+        event: 'audioSuccess',
+        action: action,
+        data: data
+      };
+      this.sendToWeb(successCallback);
+    }
+  }
+
+  /**
+   * 发送错误消息到Web
+   * @param action 操作类型
+   * @param error 错误信息
+   */
+  private sendError(action: string, error: string): void {
+    if (this.sendToWeb) {
+      const errorCallback: AudioCallbackData = {
+        event: 'audioError',
+        action: action,
+        error: error
+      };
+      this.sendToWeb(errorCallback);
+    }
+  }
+
+  /**
+   * 销毁音频桥接
+   */
+  destroy(): void {
+    this.audioManager.destroy();
+    this.sendToWeb = null;
+    console.info('AudioBridge已销毁');
+  }
+}

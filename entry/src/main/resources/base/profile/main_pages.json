@@ -1,5 +1,8 @@
 {
   "src": [
-    "pages/Index"
+    "pages/Index",
+    "pages/WebContainer",
+    "pages/NativeCalculator",
+    "pages/SimulatorHome"
   ]
 }

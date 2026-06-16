@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Voice Calculator"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "语音计算器"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Used to load React app and online math practice content"
+    },
+    {
+      "name": "reason_microphone",
+      "value": "Used for voice recognition to enable children to practice math with voice"
+    }
+  ]
+}
