@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "儿童语音计算器 - 让数学学习更有趣"
+      "value": "趣算宝 - 让数学学习更有趣"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "儿童语音计算器主应用"
+      "value": "趣算宝主应用"
     },
     {
       "name": "EntryAbility_label",
-      "value": "儿童语音计算器"
+      "value": "趣算宝"
     },
     {
       "name": "reason_internet",

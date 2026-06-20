@@ -16,11 +16,18 @@ interface VoiceSettings {
   pitch: number
 }
 
+interface PendingSpeech {
+  text: string
+  queueMode: number
+}
+
 // 音频管理器 - 处理语音播报功能
 export class AudioManager {
   private static instance: AudioManager | null = null
   private isEnabled: boolean = true
   private ttsEngine: textToSpeech.TextToSpeechEngine | null = null
+  private isTtsInitializing: boolean = false
+  private pendingSpeeches: PendingSpeech[] = []
   private speechRate: number = 0.8
   private speechPitch: number = 1.1
   private currentVoice: string = '小美老师'
@@ -84,26 +91,59 @@ export class AudioManager {
       return;
     }
 
-    // 优先使用系统的 TextToSpeechEngine (合成音)
     if (this.ttsEngine) {
-      let speakParams: textToSpeech.SpeakParams = {
-        requestId: `tts_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
-        extraParams: {
-          "queueMode": queueMode,
-          "playType": 1,
-          "speed": this.speechRate,
-          "pitch": this.speechPitch,
-          "volume": Math.round(this.targetVolume * 15)
-        }
-      };
-      try {
-        this.ttsEngine.speak(text, speakParams);
-      } catch (error) {
-        console.error('TTS speak failed:', JSON.stringify(error));
-      }
-    } else {
-      console.warn(`[TTS] 语音引擎未就绪或初始化失败，无法播报: ${text}`);
+      this.speakWithEngine(text, queueMode);
+      return;
     }
+
+    this.enqueueSpeech(text, queueMode);
+    this.initTtsEngine();
+  }
+
+  private speakWithEngine(text: string, queueMode: number): void {
+    if (!this.ttsEngine) {
+      this.enqueueSpeech(text, queueMode);
+      this.initTtsEngine();
+      return;
+    }
+
+    let speakParams: textToSpeech.SpeakParams = {
+      requestId: `tts_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
+      extraParams: {
+        "queueMode": queueMode,
+        "playType": 1,
+        "speed": this.speechRate,
+        "pitch": this.speechPitch,
+        "volume": Math.max(0, Math.min(2, this.targetVolume * 2))
+      }
+    };
+    try {
+      this.ttsEngine.speak(text, speakParams);
+    } catch (error) {
+      console.error('TTS speak failed:', JSON.stringify(error));
+    }
+  }
+
+  private enqueueSpeech(text: string, queueMode: number): void {
+    if (queueMode === 0) {
+      this.pendingSpeeches = [];
+    }
+    this.pendingSpeeches.push({ text, queueMode });
+    if (this.pendingSpeeches.length > 3) {
+      this.pendingSpeeches = this.pendingSpeeches.slice(this.pendingSpeeches.length - 3);
+    }
+    console.info(`[TTS] 语音引擎未就绪，已暂存播报: ${text}`);
+  }
+
+  private flushPendingSpeeches(): void {
+    if (!this.ttsEngine || this.pendingSpeeches.length === 0) {
+      return;
+    }
+    const speeches = this.pendingSpeeches;
+    this.pendingSpeeches = [];
+    speeches.forEach((speech: PendingSpeech) => {
+      this.speakWithEngine(speech.text, speech.queueMode);
+    });
   }
 
   // 设置语音
@@ -287,24 +327,46 @@ export class AudioManager {
   }
 
   private initTtsEngine() {
-    let extraParams: Record<string, Object> = {
-      "style": '0',
-      "language": 'zh-CN',
-      "playType": 1
-    };
-    let initParamsInfo: textToSpeech.CreateEngineParams = {
-      language: 'zh-CN',
-      person: 0, // 统一使用系统默认发音人(通常为0)，通过 rate 和 pitch 来区分不同角色，避免部分设备不支持导致引擎创建失败
-      online: 1,
-      extraParams: extraParams
-    };
-    try {
-      if (this.ttsEngine) {
-        this.ttsEngine.shutdown();
-        this.ttsEngine = null;
+    if (this.ttsEngine || this.isTtsInitializing) {
+      return;
+    }
+    this.isTtsInitializing = true;
+    this.createTtsEngine(0);
+  }
+
+  private getTtsInitParams(): textToSpeech.CreateEngineParams[] {
+    // HarmonyOS 6.1 on some devices rejects unsupported extraParams such as style.
+    // Keep engine creation params minimal and retry with offline mode if online TTS is unavailable.
+    let extraParams: Record<string, Object> = {};
+    return [
+      {
+        language: 'zh-CN',
+        person: 0,
+        online: 1,
+        extraParams: extraParams
+      },
+      {
+        language: 'zh-CN',
+        person: 0,
+        online: 0,
+        extraParams: extraParams
       }
-      textToSpeech.createEngine(initParamsInfo, (err: BusinessError, engine: textToSpeech.TextToSpeechEngine) => {
+    ];
+  }
+
+  private createTtsEngine(index: number): void {
+    const initParamsList = this.getTtsInitParams();
+    if (index >= initParamsList.length) {
+      this.isTtsInitializing = false;
+      this.pendingSpeeches = [];
+      console.error('Failed to create TTS engine: all init params failed');
+      return;
+    }
+
+    try {
+      textToSpeech.createEngine(initParamsList[index], (err: BusinessError, engine: textToSpeech.TextToSpeechEngine) => {
         if (!err) {
+          this.isTtsInitializing = false;
           this.ttsEngine = engine;
           let listener: textToSpeech.SpeakListener = {
             onStart: (requestId: string, response: Object) => { console.info('TTS Playback started: ' + requestId); },
@@ -316,12 +378,15 @@ export class AudioManager {
           };
           this.ttsEngine.setListener(listener);
           console.info('TTS Engine created successfully');
+          this.flushPendingSpeeches();
         } else {
-          console.error('Failed to create TTS engine:', JSON.stringify(err));
+          console.error(`Failed to create TTS engine with params index ${index}:`, JSON.stringify(err));
+          this.createTtsEngine(index + 1);
         }
       });
     } catch (error) {
-      console.error('Failed to call createEngine:', JSON.stringify(error));
+      console.error(`Failed to call createEngine with params index ${index}:`, JSON.stringify(error));
+      this.createTtsEngine(index + 1);
     }
   }
 
@@ -349,20 +414,23 @@ export class AudioManager {
   }
 
   destroy(): void {
-    if (this.ttsEngine) {
+    const engine = this.ttsEngine
+    if (engine) {
       try {
-        this.ttsEngine.shutdown()
+        engine.shutdown()
       } catch (error) {
         console.error('TTS engine shutdown error:', JSON.stringify(error))
       }
       this.ttsEngine = null
     }
+    this.isTtsInitializing = false
+    this.pendingSpeeches = []
   }
 
   async setVolume(volume: number): Promise<void> {
     const clamped = Math.max(0, Math.min(1, volume))
     this.targetVolume = clamped
-    // 音量设置会保存在 targetVolume 中，下次执行 speakText 时会自动应用到 TTS 的 volume 参数中 (0-15)
+    // HarmonyOS 6.1 TTS speak 参数要求 volume 在 0-2 范围内。
   }
 
   async preloadCommonAudios(): Promise<void> {

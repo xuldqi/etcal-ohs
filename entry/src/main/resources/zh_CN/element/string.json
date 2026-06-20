@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "模块描述"
+      "value": "趣算宝"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "儿童语音计算器"
+      "value": "趣算宝"
     },
     {
       "name": "EntryAbility_label",
-      "value": "儿童语音计算器"
+      "value": "趣算宝"
     }
   ]
 }
