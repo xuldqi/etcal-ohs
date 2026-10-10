@@ -4,6 +4,7 @@ import common from '@ohos.app.ability.common';
 import AudioBridge from './AudioBridge';
 import StorageBridge from './StorageBridge';
 import VoiceBridge from './VoiceBridge';
+import { AdManager } from '../managers/AdManager';
 
 // 导入各个 Bridge 的回调数据类型
 interface JSAudioCallbackData {
@@ -119,7 +120,7 @@ export default class JSBridge {
    * JSProxy 调用的原生入口方法
    */
   postMessage(action: string, paramJson: string): void {
-    console.info(`JSBridge.postMessage收到Web消息: action=${action}, paramJson=${paramJson}`);
+    console.warn(`JSBridge.postMessage收到Web消息: action=${action}, paramJson=${paramJson}`);
     try {
       const data: BridgeMessageData = JSON.parse(paramJson);
       this.handleMessage(action, data);
@@ -182,7 +183,7 @@ export default class JSBridge {
    * @param data 数据
    */
   private handleMessage(action: string, data: BridgeMessageData): void {
-    console.info(`JSBridge收到消息: ${action}`, JSON.stringify(data));
+    console.warn(`JSBridge收到消息: ${action} ${JSON.stringify(data)}`);
 
     try {
       // 根据action类型分发到对应的Bridge
@@ -194,12 +195,31 @@ export default class JSBridge {
         this.voiceBridge.handleMessage(action, data as Record<string, string | number | boolean>);
       } else if (action.startsWith('device_')) {
         this.handleDeviceMessage(action, data);
+      } else if (action.startsWith('ad_')) {
+        this.handleAdMessage(action, data);
       } else {
         console.warn(`未知的消息类型: ${action}`);
       }
     } catch (error) {
       console.error(`处理消息失败: ${action}`, JSON.stringify(error));
       this.sendErrorToWeb(action, error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
+   * 处理广告相关消息
+   */
+  private handleAdMessage(action: string, data: BridgeMessageData): void {
+    console.info(`[JSBridge] 收到广告操作: ${action}`);
+    switch (action) {
+      case 'ad_setConsent':
+        void AdManager.getInstance().initIfConsented(this.context ?? undefined);
+        break;
+      case 'ad_showInterstitial':
+        AdManager.getInstance().showInterstitial();
+        break;
+      default:
+        console.warn(`未知的广告操作: ${action}`);
     }
   }
 

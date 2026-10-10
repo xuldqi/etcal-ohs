@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "趣算宝"
+      "value": "小鹿口算计算器"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "趣算宝"
+      "value": "小鹿口算计算器"
     },
     {
       "name": "EntryAbility_label",
-      "value": "趣算宝"
+      "value": "小鹿口算计算器"
     }
   ]
 }

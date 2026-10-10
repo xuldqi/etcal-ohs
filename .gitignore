@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.hvigor/
+.arkui-x-bak/
+build/
+entry/build/
+entry/.preview/
+entry/.idea/
+entry/oh_modules/
+oh_modules/
+*.log
+*.exp

@@ -1,0 +1,58 @@
+#!/bin/bash
+# Copyright (c) 2024 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+cd $(dirname $0)
+
+# Use DevEco Studio's hvigor directly
+HVIGOR_SCRIPT="/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/bin/hvigor.js"
+NODE_EXE="/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
+
+if [ ! -f "${HVIGOR_SCRIPT}" ]; then
+    echo "Error: Could not find DevEco Studio hvigor at ${HVIGOR_SCRIPT}"
+    exit 1
+fi
+
+# Read value from local.properties
+read_prop() {
+    local key="$1"
+    local file="$2"
+    if [ ! -f "$file" ]; then
+        return 1
+    fi
+    local value
+    value=$(grep -E "^${key}=" "$file" | head -n 1 | cut -d'=' -f2-)
+    if [ -z "$value" ]; then
+        return 1
+    fi
+    # local.properties may escape ":" as "\:"
+    value="${value//\\:/:}"
+    echo "$value"
+}
+
+LOCAL_PROPERTIES_FILE="$(pwd)/local.properties"
+HWSDK_DIR_FROM_PROP="$(read_prop "hwsdk.dir" "${LOCAL_PROPERTIES_FILE}" || true)"
+SDK_DIR_FROM_PROP="$(read_prop "sdk.dir" "${LOCAL_PROPERTIES_FILE}" || true)"
+
+# Set environment variables
+export HVIGOR_PROJECT_ROOT="$(pwd)"
+export DEVECO_SDK_HOME="${DEVECO_SDK_HOME:-${HWSDK_DIR_FROM_PROP:-/Applications/DevEco-Studio.app/Contents/sdk/default/hms}}"
+export hwsdk_dir="${hwsdk_dir:-${HWSDK_DIR_FROM_PROP:-${DEVECO_SDK_HOME}}}"
+export sdk_dir="${sdk_dir:-${SDK_DIR_FROM_PROP:-/Applications/DevEco-Studio.app/Contents/sdk/default/hms}}"
+export nodejs_dir="/Applications/DevEco-Studio.app/Contents/tools/node"
+export HVIGOR_INST_PATH="/Applications/DevEco-Studio.app/Contents/tools/hvigor"
+
+# Execute hvigor
+exec "${NODE_EXE}" "${HVIGOR_SCRIPT}" "$@"

@@ -1,0 +1,10 @@
+import { appTasks } from '@ohos/hvigor-ohos-plugin';
+
+// 应用级别的Hvigor构建配置
+export default {
+  system: appTasks,
+  product: {
+    // 产品级别的配置
+  },
+  plugins: []
+};

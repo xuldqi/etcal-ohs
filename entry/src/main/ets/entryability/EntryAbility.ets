@@ -2,8 +2,14 @@ import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 
+import common from '@ohos.app.ability.common';
+
 export default class EntryAbility extends UIAbility {
+  public static context: common.UIAbilityContext;
+  public static windowStage: window.WindowStage;
+
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    EntryAbility.context = this.context as common.UIAbilityContext;
     hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
@@ -14,6 +20,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     // Main window is created, set main page for this ability
     hilog.info(0x0000, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
+    EntryAbility.windowStage = windowStage;
     this.loadPageWithFallback(windowStage, 'pages/WebContainer', 'pages/SimulatorHome');
   }
 

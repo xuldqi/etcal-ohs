@@ -207,6 +207,20 @@ struct WebContainer {
           }
         };
 
+        // 广告代理
+        window.HarmonyBridge.ad = {
+          setConsent: function(consent) {
+            if (window.HarmonyBridgeNative) {
+              window.HarmonyBridgeNative.postMessage('ad_setConsent', JSON.stringify({ consent: consent }));
+            }
+          },
+          showInterstitial: function() {
+            if (window.HarmonyBridgeNative) {
+              window.HarmonyBridgeNative.postMessage('ad_showInterstitial', '{}');
+            }
+          }
+        };
+
         // 设置桥接回调处理函数
         window.HarmonyBridge._handleNativeCallback = function(data) {
           console.log('收到原生回调:', JSON.stringify(data));

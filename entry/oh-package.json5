@@ -6,6 +6,7 @@
   "author": "",
   "license": "",
   "dependencies": {
+    "@csj/openadsdk": "file:./libs/openadsdk_7.5.4.har"
   }
 }
 

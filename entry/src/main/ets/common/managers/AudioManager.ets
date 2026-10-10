@@ -90,13 +90,15 @@ export class AudioManager {
     if (!text || !this.isEnabled) {
       return;
     }
+    const speechText = this.normalizeMathTextForSpeech(text)
+    console.warn(`[TTS] 请求播报: ${speechText}`)
 
     if (this.ttsEngine) {
-      this.speakWithEngine(text, queueMode);
+      this.speakWithEngine(speechText, queueMode);
       return;
     }
 
-    this.enqueueSpeech(text, queueMode);
+    this.enqueueSpeech(speechText, queueMode);
     this.initTtsEngine();
   }
 
@@ -118,6 +120,7 @@ export class AudioManager {
       }
     };
     try {
+      console.warn(`[TTS] 调用引擎播报: ${text}`)
       this.ttsEngine.speak(text, speakParams);
     } catch (error) {
       console.error('TTS speak failed:', JSON.stringify(error));
@@ -278,9 +281,29 @@ export class AudioManager {
 
   // 转换数字为符合中文朗读习惯的文本 (例如: "45" -> "四十五")
   private convertNumberToChinese(numberStr: string): string {
+    const cleaned = numberStr.trim().replace(/^≈/, '')
+    if (cleaned === '.') {
+      return '点'
+    }
+    if (cleaned.includes('.')) {
+      const isNegative = cleaned.startsWith('-')
+      const unsigned = isNegative ? cleaned.substring(1) : cleaned
+      const parts = unsigned.split('.')
+      const integerText = this.convertIntegerToChinese(parts[0] || '0')
+      const decimalText = (parts[1] || '').split('')
+        .map((digit: string) => this.convertDigitToChinese(digit))
+        .join('')
+      return `${isNegative ? '负' : ''}${integerText}点${decimalText}`
+    }
+
+    return this.convertIntegerToChinese(cleaned)
+  }
+
+  private convertIntegerToChinese(numberStr: string): string {
     const num = parseInt(numberStr, 10);
     if (isNaN(num)) return numberStr;
-    if (num < 0 || num > 100) return numberStr; // 仅针对游戏数字处理0-100
+    if (num < 0) return '负' + this.convertIntegerToChinese(String(Math.abs(num)));
+    if (num > 100) return numberStr; // 仅针对游戏数字处理0-100
     if (num === 100) return '一百';
     
     const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
@@ -294,6 +317,84 @@ export class AudioManager {
     return digits[tens] + '十' + (units === 0 ? '' : digits[units]);
   }
 
+  private convertDigitToChinese(digit: string): string {
+    const digits = new Map<string, string>([
+      ['0', '零'],
+      ['1', '一'],
+      ['2', '二'],
+      ['3', '三'],
+      ['4', '四'],
+      ['5', '五'],
+      ['6', '六'],
+      ['7', '七'],
+      ['8', '八'],
+      ['9', '九']
+    ])
+    return digits.get(digit) || digit
+  }
+
+  private normalizeMathTextForSpeech(text: string): string {
+    let result = ''
+    let i = 0
+    while (i < text.length) {
+      const current = text.charAt(i)
+      const next = i + 1 < text.length ? text.charAt(i + 1) : ''
+      const isNegativeNumber = current === '-' && this.isDigit(next) &&
+        (i === 0 || !this.isDigit(text.charAt(i - 1)))
+
+      if (this.isDigit(current) || isNegativeNumber) {
+        let start = i
+        i += isNegativeNumber ? 1 : 0
+        while (i < text.length && this.isDigit(text.charAt(i))) {
+          i++
+        }
+        if (i < text.length && text.charAt(i) === '.') {
+          i++
+          while (i < text.length && this.isDigit(text.charAt(i))) {
+            i++
+          }
+        }
+        result += this.convertNumberToChinese(text.substring(start, i))
+        continue
+      }
+
+      switch (current) {
+        case '≈':
+          result += '约等于'
+          break
+        case '.':
+          result += '点'
+          break
+        case '×':
+        case '*':
+          result += '乘'
+          break
+        case '÷':
+        case '/':
+          result += '除'
+          break
+        case '+':
+          result += '加'
+          break
+        case '-':
+          result += '减'
+          break
+        case '=':
+          result += '等于'
+          break
+        default:
+          result += current
+          break
+      }
+      i++
+    }
+    return result
+  }
+
+  private isDigit(char: string): boolean {
+    return char >= '0' && char <= '9'
+  }
+
   // 转换运算符为中文文本
   private convertOperatorToText(operator: string): string {
     const operatorMap = new Map<string, string>()
@@ -304,6 +405,7 @@ export class AudioManager {
     operatorMap.set('×', '乘')
     operatorMap.set('÷', '除')
     operatorMap.set('=', '等于')
+    operatorMap.set('.', '点')
     operatorMap.set('>', '大于')
     operatorMap.set('<', '小于')
 
@@ -369,15 +471,15 @@ export class AudioManager {
           this.isTtsInitializing = false;
           this.ttsEngine = engine;
           let listener: textToSpeech.SpeakListener = {
-            onStart: (requestId: string, response: Object) => { console.info('TTS Playback started: ' + requestId); },
-            onComplete: (requestId: string, response: Object) => { console.info('TTS Playback completed: ' + requestId); },
-            onStop: (requestId: string, response: Object) => { console.info('TTS Playback stopped: ' + requestId); },
+            onStart: (requestId: string, response: Object) => { console.warn('TTS Playback started: ' + requestId); },
+            onComplete: (requestId: string, response: Object) => { console.warn('TTS Playback completed: ' + requestId); },
+            onStop: (requestId: string, response: Object) => { console.warn('TTS Playback stopped: ' + requestId); },
             onError: (requestId: string, errorCode: number, errorMessage: string) => {
               console.error(`TTS Error: ${errorCode}, ${errorMessage}`);
             }
           };
           this.ttsEngine.setListener(listener);
-          console.info('TTS Engine created successfully');
+          console.warn('TTS Engine created successfully');
           this.flushPendingSpeeches();
         } else {
           console.error(`Failed to create TTS engine with params index ${index}:`, JSON.stringify(err));
@@ -394,7 +496,7 @@ export class AudioManager {
     this.initTtsEngine()
   }
 
-  async playNumber(value: number): Promise<void> {
+  async playNumber(value: number | string): Promise<void> {
     this.speakNumber(String(value))
   }
 
@@ -453,7 +555,7 @@ export class AudioManager {
   // 播报欢迎语
   speakWelcome() {
     const welcomeMessages = [
-      '欢迎使用语音计算器！',
+      '欢迎使用小鹿口算计算器！',
       '让我们一起学习数学吧！',
       '准备好开始数学之旅了吗？',
       '数学学习，从这里开始！'

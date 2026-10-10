@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "趣算宝 - 让数学学习更有趣"
+      "value": "小鹿口算计算器 - 让数学学习更有趣"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "趣算宝主应用"
+      "value": "小鹿口算计算器主应用"
     },
     {
       "name": "EntryAbility_label",
-      "value": "趣算宝"
+      "value": "小鹿口算计算器"
     },
     {
       "name": "reason_internet",

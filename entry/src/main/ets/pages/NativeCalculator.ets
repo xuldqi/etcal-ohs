@@ -103,7 +103,7 @@ struct NativeCalculator {
   build() {
     Column() {
       // 顶部标题
-      Text('🧮 语音计算器')
+      Text('🧮 计算器')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor('#2196F3')

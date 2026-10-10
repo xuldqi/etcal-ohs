@@ -25,7 +25,8 @@
         "signingConfig": "default",
         "buildOption": {
           "strictMode": {
-            "noExternalImportByPath": true
+            "noExternalImportByPath": true,
+            "useNormalizedOHMUrl": true
           }
         }
       },
@@ -38,7 +39,8 @@
         "signingConfig": "default",
         "buildOption": {
           "strictMode": {
-            "noExternalImportByPath": true
+            "noExternalImportByPath": true,
+            "useNormalizedOHMUrl": true
           }
         }
       }

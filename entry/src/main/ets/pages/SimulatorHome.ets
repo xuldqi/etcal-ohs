@@ -40,7 +40,7 @@ struct SimulatorHome {
           this.result = '2 + 3 = 5'
         })
         
-      Text('完整语音计算器功能请在真机测试')
+      Text('完整计算器功能请在真机测试')
         .fontSize(12)
         .fontColor(Color.Gray)
         .textAlign(TextAlign.Center)

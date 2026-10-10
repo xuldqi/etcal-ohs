@@ -5,7 +5,7 @@ import { AudioManager } from '../managers/AudioManager';
  * 音频消息数据接口
  */
 interface AudioMessageData {
-  number?: number;
+  number?: number | string;
   operator?: string;
   volume?: number;
   text?: string;
@@ -57,7 +57,7 @@ export default class AudioBridge {
     try {
       switch (action) {
         case 'audio_playNumber':
-          if (data.number !== undefined && typeof data.number === 'number') {
+          if (data.number !== undefined && (typeof data.number === 'number' || typeof data.number === 'string')) {
             await this.playNumber(data.number);
           }
           break;
@@ -93,10 +93,10 @@ export default class AudioBridge {
 
   /**
    * 播放数字语音
-   * @param number 数字
+   * @param number 数字或小数点
    */
-  private async playNumber(number: number): Promise<void> {
-    console.info(`播放数字语音: ${number}`);
+  private async playNumber(number: number | string): Promise<void> {
+    console.warn(`播放数字语音: ${number}`);
     
     try {
       await this.audioManager.playNumber(number);
@@ -113,7 +113,7 @@ export default class AudioBridge {
    * @param operator 运算符
    */
   private async playOperator(operator: string): Promise<void> {
-    console.info(`播放运算符语音: ${operator}`);
+    console.warn(`播放运算符语音: ${operator}`);
     
     try {
       await this.audioManager.playOperator(operator);
@@ -130,7 +130,7 @@ export default class AudioBridge {
    * @param text 要播报的文字
    */
   private async speakText(text: string): Promise<void> {
-    console.info(`使用TTS播报文字: ${text}`);
+    console.warn(`使用TTS播报文字: ${text}`);
     
     try {
       this.audioManager.speakText(text);

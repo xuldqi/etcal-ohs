@@ -205,7 +205,7 @@
             <div class="section">
                 <h2>5. 第三方SDK说明</h2>
                 <p>
-                    为实现广告投放与统计分析等功能，我们集成了如下第三方SDK。我们遵循最小化原则，仅在提供相应功能所必需的范围内与这些SDK共享必要信息；您撤回授权后将不再初始化相关SDK（首次冷启动仅进行不采集/不上报的预初始化）。
+                    为实现插屏广告投放与统计分析等功能，我们集成了如下第三方SDK。我们遵循最小化原则，仅在提供相应功能所必需的范围内与这些SDK共享必要信息；广告SDK仅在您或监护人同意隐私政策后初始化，您撤回授权后将不再初始化相关SDK（首次冷启动仅进行不采集/不上报的预初始化）。
                 </p>
 
                 <h3>5.1 通用"使用的信息"说明</h3>
@@ -250,20 +250,21 @@
                 </ul>
                 <p><strong>用户控制权：</strong>您可以在应用设置中随时撤回对后台信息收集的同意，撤回后我们将停止所有后台信息收集行为。</p>
                 <p>
-                    为实现广告投放与统计分析等功能，我们集成了如下第三方SDK。我们遵循最小化原则，仅在提供相应功能所必需的范围内与这些SDK共享必要信息；您撤回授权后将不再初始化相关SDK。
+                    当前 Android 版本仅接入穿山甲插屏广告SDK与友盟统计SDK；未接入快手联盟、腾讯优量汇等其他广告SDK。
                 </p>
 
                 <h3>5.2 穿山甲广告SDK（字节跳动）</h3>
                 <ul>
-                    <li><strong>服务类型：</strong>投放广告、统计分析、反作弊</li>
+                    <li><strong>服务类型：</strong>插屏广告投放、广告统计分析、广告反作弊</li>
                     <li><strong>公司名称：</strong>北京巨量引擎网络技术有限公司</li>
+                    <li><strong>应用ID：</strong>5746047</li>
+                    <li><strong>广告位ID：</strong>972630238（新插屏广告）</li>
                     <li><strong>收集的信息：</strong>
                         <ul>
                             <li><strong>设备基础信息：</strong>设备品牌、型号、软件系统版本、分辨率、网络信号强度、设备语言、传感器信息等基础信息</li>
-                            <li><strong>设备标识符：</strong>AndroidID、无线网SSID名称、WiFi路由器MAC地址、设备的MAC地址、设备标识符（如IMEI、OAID、SSID、IMSI、ICCID、GAID（仅GMS服务）、MEID、设备硬件序列号</li>
+                            <li><strong>设备标识符：</strong>Android ID、OAID等广告投放和反作弊所需标识；我们已通过SDK隐私控制关闭定位、电话状态、外部存储写入、麦克风等非必要采集能力</li>
                             <li><strong>应用信息：</strong>开发者应用名、应用包名、版本号、应用前后台状态、应用列表信息</li>
                             <li><strong>广告交互数据：</strong>对广告的展示、点击及转化等交互数据</li>
-                            <li><strong>位置信息：</strong>设备地理位置信息</li>
                             <li><strong>性能数据：</strong>崩溃数据、性能数据</li>
                             <li><strong>网络信息：</strong>IP地址、运营商信息、设备时区</li>
                         </ul>
@@ -272,76 +273,14 @@
                         <ul>
                             <li>设备标识：<strong>仅在应用启动时收集一次</strong></li>
                             <li>网络信息：<strong>每次广告请求时收集</strong></li>
-                            <li>地理位置：<strong>仅在广告展示时临时收集</strong></li>
                             <li>广告数据：<strong>仅在用户与广告交互时收集</strong></li>
                         </ul>
                     </li>
-                    <li><strong>使用权限：</strong>INTERNET、ACCESS_NETWORK_STATE、ACCESS_WIFI_STATE；（旧系统）READ/WRITE_EXTERNAL_STORAGE用于素材缓存</li>
+                    <li><strong>使用权限：</strong>INTERNET、ACCESS_NETWORK_STATE、ACCESS_WIFI_STATE；（旧系统）READ/WRITE_EXTERNAL_STORAGE仅在系统允许范围内用于素材缓存</li>
                     <li><strong>隐私政策链接：</strong><a href="https://www.pangle.cn/privacy/partner" target="_blank" style="color:#3b82f6;text-decoration:underline;">https://www.pangle.cn/privacy/partner</a></li>
                 </ul>
 
-                <h3>5.3 快手联盟SDK（Kuaishou/KSAdSDK）</h3>
-                <ul>
-                    <li><strong>服务类型：</strong>广告请求、统计分析、反作弊</li>
-                    <li><strong>公司名称：</strong>北京快手科技有限公司</li>
-                    <li><strong>收集的信息：</strong>
-                        <ul>
-                            <li><strong>设备标识符：</strong>IMEI、MEID、IMSI、IDFA、Android ID、MAC、OAID、SSID、DEVICE_ID、OPENUDID、GUID、硬件序列号等相关信息</li>
-                            <li><strong>网络信息：</strong>OAID、SSID、BSSID、IP地址、WiFi信息、基站信息、运营商信息、联网方式</li>
-                            <li><strong>传感器信息：</strong>陀螺仪、重力传感器、加速度传感器等基础信息（用于广告反作弊）</li>
-                            <li><strong>应用信息：</strong>应用崩溃信息、通知开关状态、软件列表、应用安装/更新/卸载行为等相关信息</li>
-                            <li><strong>设备参数及系统信息：</strong>设备类型、设备型号、操作系统及硬件相关信息、屏幕分辨率、系统区域设置</li>
-                            <li><strong>设备硬件序列号：</strong>设备唯一硬件标识</li>
-                            <li><strong>位置信息：</strong>设备地理位置信息</li>
-                            <li><strong>广告数据：</strong>广告的展示、点击及转化等交互数据、反作弊/频控/结算数据</li>
-                        </ul>
-                    </li>
-                    <li><strong>收集频率：</strong>
-                        <ul>
-                            <li>设备标识：<strong>仅在应用启动时收集一次</strong></li>
-                            <li>应用信息：<strong>仅在用户同意后首次启动时收集一次</strong>，后续不再收集</li>
-                            <li>网络信息：<strong>每次广告请求时收集</strong></li>
-                            <li>传感器信息：<strong>仅在广告展示时临时收集</strong></li>
-                            <li>位置信息：<strong>仅在广告展示时临时收集</strong></li>
-                            <li>广告数据：<strong>仅在用户与广告交互时收集</strong></li>
-                        </ul>
-                    </li>
-                    <li><strong>使用权限：</strong>INTERNET、ACCESS_NETWORK_STATE、ACCESS_WIFI_STATE；（旧系统）READ/WRITE_EXTERNAL_STORAGE用于素材缓存</li>
-                    <li><strong>隐私政策链接：</strong><a href="https://www.kuaishou.com/about/policy?tab=privacy" target="_blank" style="color:#3b82f6;text-decoration:underline;">https://www.kuaishou.com/about/policy?tab=privacy</a></li>
-                </ul>
-
-                <h3>5.4 腾讯优量汇广告SDK（GDT）</h3>
-                <ul>
-                    <li><strong>服务类型：</strong>广告请求、统计分析、反作弊</li>
-                    <li><strong>公司名称：</strong>腾讯科技(深圳)有限公司</li>
-                    <li><strong>收集的信息：</strong>
-                        <ul>
-                            <li><strong>设备标识符：</strong>IMEI、MEID、IDFA、Android ID、MAC、OAID、SIM卡IMSI等相关信息</li>
-                            <li><strong>个人信息：</strong>OAID、SSID、BSSID等个人信息</li>
-                            <li><strong>传感器信息：</strong>陀螺仪、重力传感器等基础信息</li>
-                            <li><strong>应用信息：</strong>应用崩溃信息、通知开关状态、软件列表等相关信息</li>
-                            <li><strong>设备参数及系统信息：</strong>设备类型、设备型号、操作系统及硬件相关信息</li>
-                            <li><strong>网络信息：</strong>IP地址、WiFi信息、基站信息等相关信息</li>
-                            <li><strong>设备硬件序列号：</strong>设备唯一硬件标识</li>
-                            <li><strong>位置信息：</strong>设备地理位置信息</li>
-                            <li><strong>广告信息：</strong>广告的展示、点击及转化等交互数据</li>
-                        </ul>
-                    </li>
-                    <li><strong>收集频率：</strong>
-                        <ul>
-                            <li>设备标识：<strong>仅在应用启动时收集一次</strong></li>
-                            <li>应用信息：<strong>仅在用户同意后首次启动时收集一次</strong>，后续不再收集</li>
-                            <li>网络信息：<strong>每次广告请求时收集</strong></li>
-                            <li>传感器信息：<strong>仅在广告展示时临时收集</strong></li>
-                            <li>位置信息：<strong>仅在广告展示时临时收集</strong></li>
-                            <li>广告数据：<strong>仅在用户与广告交互时收集</strong></li>
-                        </ul>
-                    </li>
-                    <li><strong>使用权限：</strong>INTERNET、ACCESS_NETWORK_STATE、ACCESS_WIFI_STATE；（旧系统）READ/WRITE_EXTERNAL_STORAGE用于素材缓存</li>
-                    <li><strong>隐私政策链接：</strong><a href="https://www.tencent.com/zh-cn/privacy-policy.html" target="_blank" style="color:#3b82f6;text-decoration:underline;">https://www.tencent.com/zh-cn/privacy-policy.html</a></li>
-                </ul>
-
-                <h3>5.5 友盟统计SDK（UMeng）</h3>
+                <h3>5.3 友盟统计SDK（UMeng）</h3>
                 <ul>
                     <li><strong>服务类型：</strong>统计分析</li>
                     <li><strong>公司名称：</strong>友盟同欣（北京）科技有限公司</li>
@@ -364,9 +303,9 @@
                     <li><strong>隐私政策链接：</strong><a href="https://www.umeng.com/page/policy" target="_blank" style="color:#3b82f6;text-decoration:underline;">https://www.umeng.com/page/policy</a></li>
                 </ul>
 
-                <h3>5.6 撤回同意与个性化设置</h3>
+                <h3>5.4 撤回同意与个性化设置</h3>
                 <ul>
-                    <li>您可在应用内隐私设置中关闭个性化广告或撤回授权（如提供），撤回后应用将不再初始化相关SDK。</li>
+                    <li>您可在应用内隐私设置中关闭个性化广告或撤回授权（如提供），撤回后应用将不再初始化广告SDK；已加载但未展示的广告缓存会被清理。</li>
                 </ul>
             </div>
 
@@ -430,7 +369,7 @@
                 </p>
                 <ul>
                     <li><strong>应用内举报：</strong>在应用首页点击"问题举报"按钮，填写举报表单</li>
-                    <li><strong>邮件举报：</strong>发送邮件至 novcat@colletools.com</li>
+                    <li><strong>邮件举报：</strong>发送邮件至 970951698@qq.com</li>
                     <li><strong>电话举报：</strong>拨打客服电话 400-123-4567（工作时间：周一至周五 9:00-18:00）</li>
                 </ul>
                 <p>
@@ -453,9 +392,9 @@
                 <p>如果您对本隐私政策有任何疑问、意见或建议，请通过以下方式联系我们：</p>
                 <div class="contact-info">
                     <p><strong>公司名称：</strong>安徽通拓电子商务有限公司</p>
-                    <p><strong>联系邮箱：</strong>novcat@colletools.com</p>
+                    <p><strong>联系邮箱：</strong>970951698@qq.com</p>
                     <p><strong>生效日期：</strong>2024年1月1日</p>
-                    <p><strong>最后更新：</strong>2024年1月1日</p>
+                    <p><strong>最后更新：</strong>2026年7月5日</p>
                 </div>
             </div>
         </div>

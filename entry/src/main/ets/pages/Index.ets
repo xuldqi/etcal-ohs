@@ -86,19 +86,19 @@ struct Index {
         // 功能按钮网格
         Column() {
           GridRow({ columns: 2, gutter: { x: 16, y: 16 } }) {  // 固定2列布局
-            // 语音计算器
+            // 计算器
             GridCol() {
               this.CartoonButton(
                 0,
-                '语音计算器',
+                '计算器',
                 '🧮',
                 '#fb923c',
                 () => { 
-                  console.info('点击了语音计算器');
+                  console.info('点击了计算器');
                   router.pushUrl({
                     url: 'pages/NativeCalculator'
                   }).catch((err: Error) => {
-                    console.error('跳转语音计算器失败:', JSON.stringify(err));
+                    console.error('跳转计算器失败:', JSON.stringify(err));
                   });
                 }
               )
