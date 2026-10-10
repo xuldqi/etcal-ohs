@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.tsto.chmath",
     "vendor": "TSTO",
-    "versionCode": 1000017,
-    "versionName": "1.2.15",
+    "versionCode": 1000018,
+    "versionName": "1.6.0",
     "minAPIVersion": 12,
     "targetAPIVersion": 13,
     "apiReleaseType": "Release13",
